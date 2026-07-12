@@ -77,8 +77,21 @@ function createTables() {
                     service_years REAL DEFAULT 0,
                     avg_salary REAL DEFAULT 0,
                     retiree_type TEXT DEFAULT 'main',
+                    children_count INTEGER DEFAULT 0,
+                    has_spouse INTEGER DEFAULT 0,
                     is_active INTEGER DEFAULT 1,
                     created_at TEXT DEFAULT (datetime('now','localtime'))
+                );
+            `);
+    db.run(`
+                CREATE TABLE IF NOT EXISTS retiree_changelog (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    retiree_id INTEGER NOT NULL,
+                    changed_field TEXT NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    changed_at TEXT DEFAULT (datetime('now','localtime')),
+                    FOREIGN KEY (retiree_id) REFERENCES retirees(id) ON DELETE CASCADE
                 );
             `);
     db.run(`
@@ -388,6 +401,7 @@ function loadRetirees() {
                         <td class="amount-cell">${Number(r[8]).toLocaleString('fa-IR')}</td>
                         <td>${r[9] === 'main' ? 'بازنشسته' : 'مستمری‌بگیر'}</td>
                         <td>
+                            <button class="btn btn-outline btn-sm" onclick="showRetireeHistory(${r[0]})">📜 تاریخچه</button>
                             <button class="btn btn-ghost btn-sm" onclick="editRetiree(${r[0]})">✏️</button>
                             <button class="btn btn-danger btn-sm" onclick="deleteRetiree(${r[0]})">🗑️</button>
                         </td>
@@ -404,8 +418,8 @@ function showRetireeForm(retireeId = null) {
     let data = null;
     if (retireeId && db) {
         const res = db.exec(
-            'SELECT id, national_code, first_name, last_name, father_name, birth_date, retirement_date, service_years, avg_salary, retiree_type FROM retirees WHERE id=' +
-            retireeId);
+            'SELECT id, national_code, first_name, last_name, father_name, birth_date, retirement_date, service_years, avg_salary, retiree_type, children_count, has_spouse FROM retirees WHERE id=' + retireeId
+        );
         if (res.length > 0 && res[0].values.length > 0) {
             data = res[0].values[0];
         }
@@ -423,6 +437,8 @@ function showRetireeForm(retireeId = null) {
                         <div class="form-group"><label>تاریخ بازنشستگی</label><input type="text" id="rf_retirement_date" value="${data?.[6] || ''}" placeholder="مثال: ۱۴۰۰/۰۱/۰۱"></div>
                         <div class="form-group"><label>سال خدمت</label><input type="number" id="rf_service_years" value="${data?.[7] || 0}" min="0" max="40" step="0.5"></div>
                         <div class="form-group"><label>متوسط حقوق ۲۴ ماه (ریال)</label><input type="number" id="rf_avg_salary" value="${data?.[8] || 0}" step="100000"></div>
+                        <div class="form-group"><label>تعداد فرزند تحت تکفل</label><input type="number" id="rf_children" value="${data?.[10] || 0}" min="0" max="20"></div>
+                        <div class="form-group"><label>همسر تحت تکفل</label><select id="rf_spouse"><option value="1" ${data?.[11] === 1 ? 'selected' : ''}>دارد</option><option value="0" ${data?.[11] === 0 ? 'selected' : ''}>ندارد</option></select></div>
                         <div class="form-group"><label>نوع</label><select id="rf_type"><option value="main" ${data?.[9] === 'main' ? 'selected' : ''}>بازنشسته اصلی</option><option value="dependent" ${data?.[9] === 'dependent' ? 'selected' : ''}>مستمری‌بگیر</option></select></div>
                     </div>
                     <div class="form-actions" style="margin-top:14px;">
@@ -445,6 +461,8 @@ function saveRetiree(editId) {
     const sy = parseFloat(document.getElementById('rf_service_years').value) || 0;
     const avs = parseFloat(document.getElementById('rf_avg_salary').value) || 0;
     const tp = document.getElementById('rf_type').value;
+    const children = parseInt(document.getElementById('rf_children').value) || 0;
+    const spouse = parseInt(document.getElementById('rf_spouse').value) || 0;
 
     if (!nc || !fn || !ln) {
         return showToast('❌ کد ملی، نام و نام خانوادگی الزامی است', 'error');
@@ -452,9 +470,33 @@ function saveRetiree(editId) {
 
     try {
         if (editId) {
+            // Fetch old record for audit
+            const oldData = db.exec(
+                'SELECT first_name, last_name, father_name, birth_date, retirement_date, service_years, avg_salary, retiree_type, children_count, has_spouse FROM retirees WHERE id=?',
+                [editId]
+            );
+            if (oldData.length > 0 && oldData[0].values.length > 0) {
+                const old = oldData[0].values[0];
+                const fields = ['first_name', 'last_name', 'father_name', 'birth_date', 'retirement_date', 'service_years', 'avg_salary', 'retiree_type', 'children_count', 'has_spouse'];
+                const newVals = [fn, ln, fan, bd, rd, sy, avs, tp, children, spouse];
+
+                // Compare and insert changelog
+                for (let i = 0; i < fields.length; i++) {
+                    let oldVal = old[i] == null ? '' : old[i].toString();
+                    let newVal = newVals[i] == null ? '' : newVals[i].toString();
+                    if (oldVal !== newVal) {
+                        db.run(
+                            'INSERT INTO retiree_changelog (retiree_id, changed_field, old_value, new_value) VALUES (?,?,?,?)',
+                            [editId, fields[i], oldVal, newVal]
+                        );
+                    }
+                }
+            }
+            // Update the record
             db.run(
-                `UPDATE retirees SET first_name=?, last_name=?, father_name=?, birth_date=?, retirement_date=?, service_years=?, avg_salary=?, retiree_type=? WHERE id=?`,
-                [fn, ln, fan, bd, rd, sy, avs, tp, editId]);
+                `UPDATE retirees SET first_name=?, last_name=?, father_name=?, birth_date=?, retirement_date=?, service_years=?, avg_salary=?, retiree_type=?, children_count=?, has_spouse=? WHERE id=?`,
+                [fn, ln, fan, bd, rd, sy, avs, tp, children, spouse, editId]
+            );
         } else {
             // Check duplicate
             const dup = db.exec('SELECT id FROM retirees WHERE national_code=?', [nc]);
@@ -462,8 +504,14 @@ function saveRetiree(editId) {
                 return showToast('❌ کد ملی تکراری است', 'error');
             }
             db.run(
-                `INSERT INTO retirees (national_code, first_name, last_name, father_name, birth_date, retirement_date, service_years, avg_salary, retiree_type) VALUES (?,?,?,?,?,?,?,?,?)`,
-                [nc, fn, ln, fan, bd, rd, sy, avs, tp]);
+                `INSERT INTO retirees (national_code, first_name, last_name, father_name, birth_date, retirement_date, service_years, avg_salary, retiree_type, children_count, has_spouse)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+                [nc, fn, ln, fan, bd, rd, sy, avs, tp, children, spouse]
+            );
+            // Also log creation as a history entry (optional)
+            const newId = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
+            db.run('INSERT INTO retiree_changelog (retiree_id, changed_field, old_value, new_value) VALUES (?,?,?,?)',
+                [newId, 'created', '', 'New retiree']);
         }
         persistDB();
         document.getElementById('retireeFormContainer').style.display = 'none';
@@ -497,6 +545,69 @@ function deleteRetiree(id) {
     } catch (err) {
         showToast('❌ خطا: ' + err.message, 'error');
     }
+}
+
+function showRetireeHistory(retireeId) {
+    // Fetch current retiree info
+    const retiree = db.exec('SELECT first_name, last_name, national_code FROM retirees WHERE id=?', [retireeId]);
+    if (!retiree.length || !retiree[0].values.length) return;
+    const name = retiree[0].values[0][0] + ' ' + retiree[0].values[0][1];
+    const nc = retiree[0].values[0][2];
+
+    // Fetch changelog
+    const log = db.exec(
+        'SELECT changed_field, old_value, new_value, changed_at FROM retiree_changelog WHERE retiree_id=? ORDER BY changed_at DESC',
+        [retireeId]
+    );
+    let rowsHtml = '';
+    if (log.length > 0 && log[0].values.length > 0) {
+        rowsHtml = log[0].values.map(r => `
+            <tr>
+                <td>${r[3]}</td>
+                <td>${translateField(r[0])}</td>
+                <td>${r[1]}</td>
+                <td>${r[2]}</td>
+            </tr>
+        `).join('');
+    } else {
+        rowsHtml = '<tr><td colspan="4">تغییری ثبت نشده است</td></tr>';
+    }
+
+    const modalHtml = `
+        <div class="modal-overlay" id="historyModal">
+            <div class="modal">
+                <h3>📜 تاریخچه تغییرات - ${name} (${nc})</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>تاریخ</th><th>فیلد</th><th>مقدار قبلی</th><th>مقدار جدید</th></tr></thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+                <div style="margin-top:12px;text-align:left;">
+                    <button class="btn btn-ghost" onclick="document.getElementById('historyModal').remove()">بستن</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Helper to translate field names to Persian
+function translateField(field) {
+    const map = {
+        'first_name': 'نام',
+        'last_name': 'نام خانوادگی',
+        'father_name': 'نام پدر',
+        'birth_date': 'تاریخ تولد',
+        'retirement_date': 'تاریخ بازنشستگی',
+        'service_years': 'سال خدمت',
+        'avg_salary': 'متوسط حقوق',
+        'retiree_type': 'نوع',
+        'children_count': 'تعداد فرزند',
+        'has_spouse': 'همسر تحت تکفل',
+        'created': 'ایجاد'
+    };
+    return map[field] || field;
 }
 
 // ============================================================
@@ -625,14 +736,13 @@ function updateRetireeAvgSalary(retireeId) {
 function autoFillCalc() {
     const rid = document.getElementById('calcRetireeSelect').value;
     if (!rid || !db) return;
-    const res = db.exec(
-        'SELECT service_years, avg_salary FROM retirees WHERE id=?', [rid]);
+    const res = db.exec('SELECT service_years, avg_salary, children_count, has_spouse FROM retirees WHERE id=?', [rid]);
     if (res.length > 0 && res[0].values.length > 0) {
         const sy = res[0].values[0][0];
         const avs = res[0].values[0][1];
         // Auto-fill is handled during calculation
-        document.getElementById('calcChildren').value = 0;
-        document.getElementById('calcSpouse').value = '1';
+        document.getElementById('calcChildren').value = (res[0].values[0][4] !== undefined) ? res[0].values[0][4] : 0;
+        document.getElementById('calcSpouse').value = (res[0].values[0][5] !== undefined) ? res[0].values[0][5] : 1;
     }
 }
 
@@ -935,6 +1045,12 @@ document.addEventListener('DOMContentLoaded', init);
 // Handle page unload - persist DB
 window.addEventListener('beforeunload', () => {
     persistDB();
+});
+
+document.addEventListener('click', function (e) {
+    if (e.target.id === 'historyModal') {
+        e.target.remove();
+    }
 });
 
 // Periodic auto-save (every 30 seconds)
