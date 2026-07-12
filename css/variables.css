@@ -1,0 +1,34 @@
+/**
+ * @file variables.css
+ * @description Defines CSS custom properties (design tokens) for colors,
+ *              shadows, border radii, transitions, and typography used throughout
+ *              the application, enabling easy theming.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+:root {
+    --primary: #1a5276;
+    --primary-light: #2980b9;
+    --primary-dark: #0d3446;
+    --accent: #27ae60;
+    --accent-hover: #219a52;
+    --danger: #c0392b;
+    --danger-hover: #a93226;
+    --warning: #f39c12;
+    --bg: #f5f6f8;
+    --card-bg: #ffffff;
+    --border: #dde1e6;
+    --text: #2c3e50;
+    --text-light: #5a6c7d;
+    --text-muted: #8899aa;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --transition: 0.2s ease;
+    --font: 'Segoe UI', 'Tahoma', 'Iranian Sans', sans-serif;
+}

@@ -1,0 +1,113 @@
+/**
+ * @file compoenents.css
+ * @description Reusable UI component styles: buttons (all variants), toast
+ *              notifications, and their hover/active states.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+.btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all var(--transition);
+    font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+.btn-primary {
+    background: #fff;
+    color: var(--primary);
+}
+
+    .btn-primary:hover {
+        background: #e8f0f8;
+        transform: translateY(-1px);
+    }
+
+.btn-accent {
+    background: var(--accent);
+    color: #fff;
+}
+
+    .btn-accent:hover {
+        background: var(--accent-hover);
+    }
+
+.btn-danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+    .btn-danger:hover {
+        background: var(--danger-hover);
+    }
+
+.btn-outline {
+    background: transparent;
+    border: 1.5px solid #fff;
+    color: #fff;
+}
+
+    .btn-outline:hover {
+        background: rgba(255,255,255,0.12);
+    }
+
+.btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1.5px solid var(--border);
+}
+
+    .btn-ghost:hover {
+        background: #f0f2f5;
+    }
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2c3e50;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    z-index: 9999;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    animation: slideUp 0.35s ease;
+}
+
+    .toast.success {
+        background: #27ae60;
+    }
+
+    .toast.error {
+        background: #c0392b;
+    }
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}

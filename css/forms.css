@@ -1,0 +1,52 @@
+/**
+ * @file forms.css
+ * @description Form layout and element styles: grid arrangement, labels, input/
+ *              select fields, focus states, and form action buttons.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+    .form-group label {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--text-light);
+    }
+
+    .form-group input, .form-group select {
+        padding: 10px 14px;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 0.9rem;
+        font-family: var(--font);
+        transition: border var(--transition);
+        background: #fafbfc;
+    }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(41,128,185,0.08);
+            background: #fff;
+        }
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}

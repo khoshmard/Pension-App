@@ -3,246 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه محاسبه حقوق و مزایای بازنشستگان و مستمری بگیران | صندوق بازنشستگی کشوری</title>
-
-    <link rel="stylesheet" href="/pension/styles.css">
+    <title>سامانه محاسبه حقوق بازنشستگان | صندوق بازنشستگی کشوری</title>
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/tabs.css">
+    <link rel="stylesheet" href="css/tables.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/modals.css">
+    <link rel="stylesheet" href="css/print.css">
 </head>
 <body>
-
-    <!-- ==================== HEADER ==================== -->
-    <header class="header">
+    <header class="header" id="appHeader">
         <div class="logo-area">
             <div class="logo-icon">🏛️</div>
             <div>
                 <h1>سامانه محاسبه حقوق و مزایا</h1>
-                <div class="subtitle">صندوق بازنشستگی کشوری | بازنشستگان و مستمری‌بگیران</div>
+                <div class="subtitle">صندوق بازنشستگی کشوری</div>
             </div>
         </div>
-        <div class="header-actions">
-            <button class="btn btn-outline btn-sm" onclick="exportFullDB()" title="خروجی کامل پایگاه داده">💾 ذخیره پایگاه داده</button>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFileInput').click()" title="بارگذاری پایگاه داده">📂 بارگذاری</button>
-            <input type="file" id="importFileInput" accept=".db,.sqlite,.bin" style="display:none" onchange="importDBFile(event)">
-            <button class="btn btn-primary btn-sm" onclick="window.print()" title="چاپ">🖨️ چاپ</button>
-        </div>
+        <div class="header-actions" id="headerButtons"></div>
     </header>
 
-    <!-- ==================== MAIN CONTAINER ==================== -->
-    <div class="main-container">
+    <nav class="tab-nav" id="tabNav"></nav>
+    <main class="main-container" id="mainContent"></main>
 
-        <!-- ========== TABS ========== -->
-        <nav class="tab-nav" id="tabNav">
-            <button class="tab-btn active" data-tab="dashboard">📊 داشبورد</button>
-            <button class="tab-btn" data-tab="retirees">👥 بازنشستگان</button>
-            <button class="tab-btn" data-tab="salaries">💰 سوابق حقوق</button>
-            <button class="tab-btn" data-tab="calc">🧮 محاسبه ماهانه</button>
-            <button class="tab-btn" data-tab="payments">📋 پرداخت‌ها</button>
-            <button class="tab-btn" data-tab="export">📤 خروجی CSV</button>
-            <button class="tab-btn" data-tab="settings">⚙️ تنظیمات</button>
-        </nav>
-
-        <!-- ========== TAB: DASHBOARD ========== -->
-        <div class="tab-panel active" id="panel-dashboard">
-            <div class="stats-row" id="dashboardStats"></div>
-            <div class="card">
-                <div class="card-header"><h3>آخرین محاسبات انجام شده</h3></div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th>ردیف</th><th>نام بازنشسته</th><th>کد ملی</th><th>تاریخ محاسبه</th><th>خالص پرداختی (ریال)</th><th>وضعیت</th></tr></thead>
-                        <tbody id="dashboardRecentCalcs"><tr><td colspan="6" class="empty-state"><span class="icon">📭</span> هنوز محاسبه‌ای ثبت نشده است</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========== TAB: RETIREES ========== -->
-        <div class="tab-panel" id="panel-retirees">
-            <div class="card">
-                <div class="card-header">
-                    <h3>لیست بازنشستگان و مستمری‌بگیران</h3>
-                    <button class="btn btn-accent btn-sm" onclick="showRetireeForm()">➕ افزودن بازنشسته</button>
-                </div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th>ردیف</th><th>کد ملی</th><th>نام</th><th>نام خانوادگی</th><th>نام پدر</th><th>تاریخ تولد</th><th>تاریخ بازنشستگی</th><th>سال خدمت</th><th>متوسط حقوق (ریال)</th><th>نوع</th><th>عملیات</th></tr></thead>
-                        <tbody id="retireesTableBody"><tr><td colspan="11" class="empty-state"><span class="icon">👤</span> هیچ بازنشسته‌ای ثبت نشده است</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-            <!-- Hidden form for add/edit -->
-            <div id="retireeFormContainer" style="display:none;"></div>
-        </div>
-
-        <!-- ========== TAB: SALARIES ========== -->
-        <div class="tab-panel" id="panel-salaries">
-            <div class="card">
-                <div class="card-header">
-                    <h3>سوابق حقوق و دستمزد (۲۴ ماه آخر)</h3>
-                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                        <select id="salaryRetireeFilter" onchange="loadSalaryRecords()" style="padding:8px 12px;border-radius:6px;border:1.5px solid var(--border);font-family:var(--font);">
-                            <option value="">-- انتخاب بازنشسته --</option>
-                        </select>
-                        <button class="btn btn-accent btn-sm" onclick="showSalaryForm()">➕ ثبت حقوق ماهانه</button>
-                    </div>
-                </div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th>ردیف</th><th>بازنشسته</th><th>سال</th><th>ماه</th><th>حقوق پایه (ریال)</th><th>فوق‌العاده‌ها (ریال)</th><th>جمع (ریال)</th><th>عملیات</th></tr></thead>
-                        <tbody id="salaryTableBody"><tr><td colspan="8" class="empty-state"><span class="icon">💰</span> سابقه حقوقی ثبت نشده است</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-            <div id="salaryFormContainer" style="display:none;"></div>
-        </div>
-
-        <!-- ========== TAB: CALC ========== -->
-        <div class="tab-panel" id="panel-calc">
-            <div class="card">
-                <div class="card-header"><h3>🧮 محاسبه حقوق و مزایای ماهانه</h3></div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>انتخاب بازنشسته</label>
-                        <select id="calcRetireeSelect" onchange="autoFillCalc()">
-                            <option value="">-- انتخاب کنید --</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>سال محاسبه</label>
-                        <input type="number" id="calcYear" value="1404" min="1390" max="1430">
-                    </div>
-                    <div class="form-group">
-                        <label>ماه محاسبه</label>
-                        <select id="calcMonth">
-                            <option value="1">فروردین</option>
-                            <option value="2">اردیبهشت</option>
-                            <option value="3">خرداد</option>
-                            <option value="4">تیر</option>
-                            <option value="5">مرداد</option>
-                            <option value="6">شهریور</option>
-                            <option value="7">مهر</option>
-                            <option value="8">آبان</option>
-                            <option value="9">آذر</option>
-                            <option value="10">دی</option>
-                            <option value="11">بهمن</option>
-                            <option value="12">اسفند</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>تعداد فرزند تحت تکفل</label>
-                        <input type="number" id="calcChildren" value="0" min="0" max="20">
-                    </div>
-                    <div class="form-group">
-                        <label>همسر تحت تکفل</label>
-                        <select id="calcSpouse"><option value="1">دارد</option><option value="0">ندارد</option></select>
-                    </div>
-                </div>
-                <div class="form-actions" style="margin-top:14px;">
-                    <button class="btn btn-accent" onclick="calculatePension()">🔢 محاسبه کن</button>
-                    <button class="btn btn-ghost" onclick="clearCalcResult()">🗑️ پاک کردن</button>
-                </div>
-            </div>
-            <div class="card" id="calcResultCard" style="display:none;">
-                <div class="card-header"><h3>📋 نتیجه محاسبه</h3><span class="badge" id="calcBadge"></span></div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th>شرح</th><th>مبلغ (ریال)</th><th>توضیحات</th></tr></thead>
-                        <tbody id="calcResultBody"></tbody>
-                    </table>
-                </div>
-                <div class="form-actions" style="margin-top:12px;">
-                    <button class="btn btn-accent" onclick="savePayment()">💾 ثبت پرداخت</button>
-                    <button class="btn btn-outline" onclick="exportCalcCSV()" style="border-color:var(--primary);color:var(--primary);">📤 خروجی CSV این محاسبه</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========== TAB: PAYMENTS ========== -->
-        <div class="tab-panel" id="panel-payments">
-            <div class="card">
-                <div class="card-header">
-                    <h3>سوابق پرداخت‌های ماهانه</h3>
-                    <button class="btn btn-ghost btn-sm" onclick="exportPaymentsCSV()">📤 خروجی CSV پرداخت‌ها</button>
-                </div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead><tr><th>ردیف</th><th>بازنشسته</th><th>کد ملی</th><th>سال/ماه</th><th>پایه (ریال)</th><th>عائله‌مندی</th><th>اولاد</th><th>ناخالص</th><th>کسورات</th><th>خالص (ریال)</th><th>تاریخ ثبت</th></tr></thead>
-                        <tbody id="paymentsTableBody"><tr><td colspan="11" class="empty-state"><span class="icon">📋</span> پرداختی ثبت نشده است</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========== TAB: EXPORT ========== -->
-        <div class="tab-panel" id="panel-export">
-            <div class="card">
-                <div class="card-header"><h3>📤 خروجی‌های CSV برای صندوق بازنشستگی کشوری</h3></div>
-                <div class="stats-row">
-                    <div class="stat-card" style="cursor:pointer;" onclick="exportRetireesCSV()">
-                        <div class="stat-value">👥</div>
-                        <div class="stat-label">خروجی لیست بازنشستگان</div>
-                        <small style="color:var(--text-muted);">retirees_list.csv</small>
-                    </div>
-                    <div class="stat-card accent" style="cursor:pointer;" onclick="exportPaymentsCSV()">
-                        <div class="stat-value">📋</div>
-                        <div class="stat-label">خروجی پرداخت‌های ماهانه</div>
-                        <small style="color:var(--text-muted);">monthly_payments.csv</small>
-                    </div>
-                    <div class="stat-card warning" style="cursor:pointer;" onclick="exportSalariesCSV()">
-                        <div class="stat-value">💰</div>
-                        <div class="stat-label">خروجی سوابق حقوق</div>
-                        <small style="color:var(--text-muted);">salary_history.csv</small>
-                    </div>
-                    <div class="stat-card" style="cursor:pointer;border-right-color:#8e44ad;" onclick="exportFullReportCSV()">
-                        <div class="stat-value">📊</div>
-                        <div class="stat-label">گزارش جامع (تجمعی)</div>
-                        <small style="color:var(--text-muted);">full_report.csv</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========== TAB: SETTINGS ========== -->
-        <div class="tab-panel" id="panel-settings">
-            <div class="card">
-                <div class="card-header"><h3>⚙️ تنظیمات ضرایب و آستانه‌ها</h3></div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>حداقل حقوق مصوب (ریال)</label>
-                        <input type="number" id="setMinWage" value="110000000" step="1000000">
-                    </div>
-                    <div class="form-group">
-                        <label>ضریب عائله‌مندی (درصد از حداقل حقوق)</label>
-                        <input type="number" id="setSpouseFactor" value="25" min="0" max="100" step="0.5">
-                    </div>
-                    <div class="form-group">
-                        <label>ضریب اولاد (درصد از حداقل حقوق به ازای هر فرزند)</label>
-                        <input type="number" id="setChildFactor" value="10" min="0" max="100" step="0.5">
-                    </div>
-                    <div class="form-group">
-                        <label>نرخ کسر بیمه (۱/۹ سهم صندوق - درصد)</label>
-                        <input type="number" id="setInsuranceRate" value="11.11" min="0" max="100" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label>نرخ بیمه تکمیلی (ریال ماهانه)</label>
-                        <input type="number" id="setSupplementaryIns" value="3500000" step="100000">
-                    </div>
-                    <div class="form-group">
-                        <label>سقف معافیت مالیاتی سالانه (ریال)</label>
-                        <input type="number" id="setTaxExemption" value="1200000000" step="10000000">
-                    </div>
-                    <div class="form-group">
-                        <label>حداکثر سنوات خدمت قابل محاسبه</label>
-                        <input type="number" id="setMaxYears" value="30" min="1" max="40">
-                    </div>
-                </div>
-                <div class="form-actions" style="margin-top:14px;">
-                    <button class="btn btn-accent" onclick="saveSettings()">💾 ذخیره تنظیمات</button>
-                    <button class="btn btn-ghost" onclick="loadSettingsToForm()">🔄 بارگذاری مجدد</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="/pension/sql-wasm.js"></script>
-    <script src="/pension/app.js"></script>
+    <script src="js/lib/sql-wasm.js"></script>
+    <script src="js/services/settingsService.js"></script>
+    <script src="js/services/databaseService.js"></script>
+    <script src="js/services/retireesRepository.js"></script>
+    <script src="js/services/changelogRepository.js"></script>
+    <script src="js/services/salaryRepository.js"></script>
+    <script src="js/services/paymentsRepository.js"></script>
+    <script src="js/services/itemsRepository.js"></script>
+    <script src="js/engine/calcEngine.js"></script>
+    <script src="js/ui/templates.js"></script>
+    <script src="js/ui/exports.js"></script>
+    <script src="js/ui/eventHandlers.js"></script>
+    <script src="js/ui/uiManager.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

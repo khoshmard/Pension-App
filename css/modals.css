@@ -1,0 +1,31 @@
+/**
+ * @file modals.css
+ * @description Styles for modal overlay (backdrop) and modal dialog boxes,
+ *              including scrolling and shadow effects.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 600px;
+    width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}

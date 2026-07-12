@@ -1,0 +1,67 @@
+﻿/**
+ * @file tables.css
+ * @description Styles for data tables: header, rows, responsive wrapper, amount
+ *              cells (right‑aligned, LTR), empty states, and hover effects.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    min-width: 700px;
+}
+
+thead {
+    background: #f0f4f8;
+}
+
+th {
+    padding: 11px 12px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--border);
+}
+
+td {
+    padding: 10px 12px;
+    text-align: center;
+    border-bottom: 1px solid #eef1f5;
+    white-space: nowrap;
+}
+
+tbody tr:hover {
+    background: #f8fafc;
+}
+
+.amount-cell {
+    font-weight: 600;
+    color: var(--primary-dark);
+    direction: ltr;
+    text-align: right;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+
+    .empty-state .icon {
+        font-size: 3rem;
+        margin-bottom: 12px;
+    }

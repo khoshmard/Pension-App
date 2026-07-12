@@ -1,0 +1,20 @@
+﻿/**
+ * @file reset.css
+ * @description Resets default browser styles (margin, padding, box‑sizing)
+ *              to ensure a consistent baseline across all browsers.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    line-height: 1.7;
+}

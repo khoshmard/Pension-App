@@ -1,0 +1,26 @@
+﻿/**
+ * @file print.css
+ * @description Print‑specific overrides: hides interactive elements (buttons, tabs,
+ *              header) and simplifies card appearance for clean paper output.
+ * @author      Abbas Hatami Khoshmardan
+ * @company     nouz.ir
+ * @contact     khoshmard@gmail.com
+ * @date        2025-07-12
+ * @version     1.0.0
+ */
+
+@media print {
+    .header, .tab-nav, .btn, .form-actions, .header-actions, .no-print {
+        display: none !important;
+    }
+
+    .card {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        break-inside: avoid;
+    }
+
+    body {
+        background: #fff;
+    }
+}
