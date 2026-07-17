@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.1
+ * @version     1.0.2
  * @history
+ * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
  */
@@ -17,6 +18,8 @@ const EventHandlers = (() => {
     let currentCalcResult = null;
     // temporary storage for dependent rows
     let currentDependents = [];
+    // temporary list of persons (retirees and pensioners)
+    let currentPersons = [];
 
     // ----------------------------------------------------------------
     // Utility
@@ -564,6 +567,174 @@ const EventHandlers = (() => {
     }
 
     // ----------------------------------------------------------------
+    // Decrees Tab
+    // ----------------------------------------------------------------
+    function loadDecrees() {
+        const personId = document.getElementById('decreePersonFilter').value.split('-')[0];
+        if (!personId) {
+            document.getElementById('decreesTableBody').innerHTML =
+                '<tr><td colspan="9" class="empty-state">لطفاً یک شخص را انتخاب کنید</td></tr>';
+            return;
+        }
+        const decrees = DecreeRepository.getByPersonId(parseInt(personId));
+
+        const tbody = document.getElementById('decreesTableBody');
+        if (decrees.length) {
+            tbody.innerHTML = decrees.map((d, i) => `
+                <tr>
+                    <td>${i+1}</td>
+                    <td>${d.decreeNumber || '-'}</td>
+                    <td>${d.title || '-'}</td>
+                    <td>${d.issueDate || '-'}</td>
+                    <td>${d.effectiveFrom || '-'}</td>
+                    <td>${d.isActive ? '<span style="color:green;">فعال</span>' : '<span style="color:red;">غیرفعال</span>'}</td>
+                    <td>
+                        <button class="btn btn-ghost btn-sm view-decree" data-id="${d.id}">👁️</button>
+                        <button class="btn btn-danger btn-sm delete-decree" data-id="${d.id}">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state">حکمی صادر نشده</td></tr>';
+        }
+    }
+
+    function showDecreeForm() {
+        const personFilterValue = document.getElementById('decreePersonFilter').value;
+        const parts = personFilterValue ? personFilterValue.split('-') : [];
+        const prefillPersonId = parts.length === 2 ? parseInt(parts[0]) : null;
+        const prefillType = parts.length === 2 ? parts[1] : 'retiree';
+
+        const container = document.getElementById('decreeFormContainer');
+        container.innerHTML = Templates.decreeForm(null, prefillPersonId, prefillType);
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth' });
+
+        const currentType = document.getElementById('dc_type').value;
+        repopulateDecreeFormFilter(currentType, prefillPersonId);
+
+        document.getElementById('dc_type').addEventListener('change', function () {
+            const newType = this.value;
+            repopulateDecreeFormFilter(newType, null);   // clear pre‑selected person
+        });
+
+        // Save / Cancel
+        document.getElementById('btnSaveDecree').addEventListener('click', saveDecree);
+        document.getElementById('btnCancelDecree').addEventListener('click', () => {
+            container.style.display = 'none';
+            container.innerHTML = '';
+        });
+
+        if (prefillPersonId) {
+            const personSelect = document.getElementById('dc_person_id');
+            if (personSelect) personSelect.disabled = true;
+        }
+    }
+
+    function saveDecree() {
+        const type = document.getElementById('dc_type').value;
+        const personId = parseInt(document.getElementById('dc_person_id').value);
+        const title = document.getElementById('dc_title').value.trim();
+        const decreeNumber = document.getElementById('dc_decree_number').value.trim();
+        const issueDate = document.getElementById('dc_issue_date').value.trim();
+        const effectiveFrom = document.getElementById('dc_effective_from').value.trim();
+        if (!personId) return showToast('❌ شخص را انتخاب کنید', 'error');
+        if (!effectiveFrom) return showToast('❌ تاریخ اجرا را وارد کنید', 'error');
+
+        const itemInputs = document.querySelectorAll('.decree-item-amount');
+        const items = [];
+        itemInputs.forEach(inp => {
+            const amount = parseFloat(inp.value);
+            if (!isNaN(amount) && amount !== 0) {
+                items.push({
+                    itemDefinitionId: parseInt(inp.dataset.itemId),
+                    isIncome: inp.dataset.isIncome === '1',
+                    amount
+                });
+            }
+        });
+
+        try {
+            DecreeRepository.add({ personId, type, title, decreeNumber, issueDate, effectiveFrom, items });
+            if (window._persist) window._persist();
+            document.getElementById('decreeFormContainer').style.display = 'none';
+            document.getElementById('decreeFormContainer').innerHTML = '';
+            loadDecrees();
+            showToast('✅ حکم صادر شد', 'success');
+        } catch (e) {
+            showToast('❌ خطا: ' + e.message, 'error');
+        }
+    }
+
+    function viewDecree(decreeId) {
+        const decree = DecreeRepository.getById(decreeId);
+        if (!decree) return showToast('حکم یافت نشد', 'error');
+        // Show read-only form
+        const container = document.getElementById('decreeFormContainer');
+        
+        container.innerHTML = Templates.decreeForm(decree);
+        container.style.display = 'block';
+        // Disable all inputs
+        container.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
+        repopulateDecreeFormFilter(decree.type, decree.personId);
+        document.getElementById('btnCancelDecree').addEventListener('click', () => {
+            container.style.display = 'none';
+            container.innerHTML = '';
+        });
+    }
+
+    function deleteDecree(decreeId) {
+        if (!confirm('آیا از حذف این حکم اطمینان دارید؟')) return;
+        try {
+            DecreeRepository.remove(decreeId);
+            if (window._persist) window._persist();
+            loadDecrees();
+            showToast('✅ حکم حذف شد', 'success');
+        } catch (e) {
+            showToast('❌ امکان حذف وجود ندارد. حکم در حال استفاده است.', 'error');
+        }
+    }
+
+    function populateDecreePersonFilter() {
+        const retirees = RetireesRepository.getAll();
+        const pensioners = PensionersRepository.getAll();
+        const options = '<option value="">-- انتخاب شخص --</option>' +
+            retirees.map(p => `<option value="${p.personId}-retiree">${p.person.lastName} ${p.person.firstName} (${p.person.nationalCode})</option>`).join('') +
+            pensioners.map(p => `<option value="${p.personId}-pensioner">${p.person.lastName} ${p.person.firstName} (${p.person.nationalCode})</option>`).join('');
+        document.getElementById('decreePersonFilter').innerHTML = options;  
+    }
+
+    /**
+     * Refills the 'person' dropdown in the decree form based on the selected type.
+     * @param {string} selectedType - 'retiree' or 'pensioner'
+     * @param {number|null} selectedPersonId - Pre‑select this person if provided.
+     */
+    function repopulateDecreeFormFilter(selectedType = 'retiree', selectedPersonId = null) {
+        const decreeFormFilter = document.getElementById('dc_person_id');
+        if (!decreeFormFilter) return;
+
+        const retirees = RetireesRepository.getAll();
+        const pensioners = PensionersRepository.getAll();
+
+        let options = '<option value="">-- انتخاب شخص --</option>';
+
+        if (selectedType === 'retiree') {
+            options += retirees.map(r => {
+                const sel = (r.personId == selectedPersonId) ? ' selected' : '';
+                return `<option value="${r.personId}"${sel}>${r.person.lastName} ${r.person.firstName} (${r.person.nationalCode})</option>`;
+            }).join('');
+        } else if (selectedType === 'pensioner') {
+            options += pensioners.map(p => {
+                const sel = (p.personId == selectedPersonId) ? ' selected' : '';
+                return `<option value="${p.personId}"${sel}>${p.person.lastName} ${p.person.firstName} (${p.person.nationalCode})</option>`;
+            }).join('');
+        }
+
+        decreeFormFilter.innerHTML = options;
+    }
+
+
+    // ----------------------------------------------------------------
     // Salaries (mostly unchanged, uses combined dropdown)
     // ----------------------------------------------------------------
     function loadSalaryRecords() {
@@ -932,6 +1103,17 @@ const EventHandlers = (() => {
             else if (btn.classList.contains('history-rp')) showRetireePensionerHistory(type, id);
         });
 
+        // Decrees tab
+        document.getElementById('decreePersonFilter').addEventListener('change', loadDecrees);
+        document.getElementById('btnAddDecree').addEventListener('click', showDecreeForm);
+        document.getElementById('decreesTableBody').addEventListener('click', e => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const id = btn.dataset.id;
+            if (btn.classList.contains('view-decree')) viewDecree(id);
+            else if (btn.classList.contains('delete-decree')) deleteDecree(id);
+        });
+
         // Salaries
         document.getElementById('salaryRetireeFilter').addEventListener('change', loadSalaryRecords);
         document.getElementById('btnAddSalary').addEventListener('click', showSalaryForm);
@@ -978,26 +1160,15 @@ const EventHandlers = (() => {
     return {
         bindAll,
         showToast,
+        populateDropdowns,
         refreshDashboard,
         loadPersons,
         loadRetireesPensioners,
+        loadDecrees,
+        populateDecreePersonFilter,
         loadSalaryRecords,
         loadPayments,
         loadItemsList,
-        loadSettingsForm,
-        populateDropdowns,
-        showPersonForm,
-        showRetireePensionerForm,
-        saveRetireePensioner,
-        deleteRetireePensioner,
-        deletePerson,
-        showSalaryForm,
-        saveSalary,
-        deleteSalary,
-        calculatePension,
-        savePayment,
-        showItemForm,
-        deleteItem,
-        saveSettings
+        loadSettingsForm
     };
 })();

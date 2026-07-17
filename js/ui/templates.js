@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.1
+ * @version     1.0.2
  * @history
+ * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
  */
@@ -31,8 +32,8 @@ const Templates = (() => {
      * @returns {string}
      */
     function tabNav() {
-        const tabs = ['dashboard', 'persons', 'retireesPensioners', 'salaries', 'calc', 'payments', 'export', 'settings'];
-        const labels = ['📊 داشبورد', '👥 اشخاص', '🧓 بازنشستگان/وظیفه‌بگیران', '💰 سوابق حقوق', '🧮 محاسبه', '📋 پرداخت‌ها', '📤 CSV', '⚙️ تنظیمات'];
+        const tabs = ['dashboard', 'persons', 'retireesPensioners', 'decrees', 'salaries', 'calc', 'payments', 'export', 'settings'];
+        const labels = ['📊 داشبورد', '👥 اشخاص', '🧓 بازنشستگان/وظیفه‌بگیران', '📜 احکام', '💰 سوابق حقوق', '🧮 محاسبه', '📋 پرداخت‌ها', '📤 CSV', '⚙️ تنظیمات'];
         return tabs.map((t, i) => `<button class="tab-btn ${i === 0 ? 'active' : ''}" data-tab="${t}">${labels[i]}</button>`).join('');
     }
 
@@ -109,6 +110,38 @@ const Templates = (() => {
                 </div>
             </div>
             <div id="retireePensionerFormContainer" style="display:none;"></div>
+        </div>
+
+        <!-- Decrees Tab -->
+        <div class="tab-panel" id="panel-decrees">
+            <div class="card">
+                <div class="card-header">
+                    <h3>جستجوی احکام</h3>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <select id="decreePersonFilter"><option value="">-- انتخاب شخص --</option></select>
+                        </div>
+                        <button class="btn btn-accent btn-sm" id="btnAddDecree">➕ صدور حکم جدید</button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ردیف</th>
+                                <th>شماره حکم</th>
+                                <th>عنوان</th>
+                                <th>تاریخ صدور</th>
+                                <th>تاریخ اجرا</th>
+                                <th>وضعیت</th>
+                                <th>عملیات</th>
+                            </tr>
+                            </thead>
+                        <tbody id="decreesTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="decreeFormContainer" style="display:none;"></div>
         </div>
 
         <!-- Salaries Tab -->
@@ -356,39 +389,6 @@ const Templates = (() => {
      * @param {boolean} locked - Whether the dependent is editable or not
      * @returns {string} HTML.
      */
-    /*function dependentRow(dep = {}, index, locked = false) {
-        const typeOptions = [
-            { value: '1', label: 'تبع ۱ (همسر/فرزند زیر ۱۸)' },
-            { value: '2', label: 'تبع ۲ (والدین/فرزند بالای ۱۸)' },
-            { value: '3', label: 'تبع ۳ (سایر)' }
-        ];
-        if (locked) {
-        return `
-            <div class="dependent-item" data-index="${index}" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; background:#f9fafb; padding:8px; border-radius:6px;">
-                <span style="flex:1;">${dep.personName} (${dep.personNationalCode || ''})</span>
-                <select class="dep-type" style="width:120px;">
-                    ${typeOptions.map(t => `<option value="${t.value}" ${dep.dependentType==t.value?'selected':''}>${t.label}</option>`).join('')}
-                </select>
-                <input type="hidden" class="dep-person-id" value="${dep.personId}">
-                <button type="button" class="btn btn-danger btn-sm btnRemoveDependent">🗑️</button>
-            </div>`;
-        } else {
-            return `
-            <div class="dependent-item" data-index="${index}" style="display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; background:#f9fafb; padding:8px; border-radius:6px; flex-wrap:wrap;">
-                <div style="flex:1; min-width:200px;">
-                    ${personSearchBox('dep_' + index)}
-                    ${personInlineFields('dep_' + index)}
-                </div>
-                <div class="form-group" style="width:120px;">
-                    <label>نوع تبعی</label>
-                    <select class="dep-type">
-                        ${typeOptions.map(t => `<option value="${t.value}" ${dep.dependentType==t.value?'selected':''}>${t.label}</option>`).join('')}
-                    </select>
-                </div>
-                <button type="button" class="btn btn-danger btn-sm btnRemoveDependent" style="margin-top:24px;">🗑️</button>
-            </div>`;
-        }
-    }*/
     function dependentRow(dep = {}, index, locked = false) {
         const typeOptions = [
             { value: '1', label: 'تبع ۱ (همسر/فرزند زیر ۱۸)' },
@@ -423,6 +423,82 @@ const Templates = (() => {
             ${personBlock}
             ${typeBlock}
             ${removeBtn}
+        </div>`;
+    }
+
+    // ------------------------------------------------------------------
+    // Decree and Decree Items
+    // ------------------------------------------------------------------
+    /**
+     * Generates the decree add/edit form.
+     * @param {Array} persons - List of retirees/pensioners (for person selection).
+     * @param {Array} incomeItems - All active income items.
+     * @param {Array} deductionItems - All active deduction items.
+     * @param {Object|null} data - Existing decree object
+     * @param {number} prefillPersonId - Existing Person Id
+     * @param {number} prefillType - Existing Person Type
+     * @returns {string}
+     */
+    function decreeForm(data = null, prefillPersonId = null, prefillType = 'retiree') {
+        const isEdit = !!data;
+        const selectedPersonId = data?.personId || prefillPersonId;
+        const selectedType = data?.type || prefillType;
+        const lockedPerson = !!prefillPersonId || isEdit;
+
+        const incomeItems = ItemsRepository.getIncomes();
+        const deductionItems = ItemsRepository.getDeductions();
+
+        const typeOptions = `
+            <option value="retiree" ${selectedType === 'retiree' ? 'selected' : ''}>مستمری‌بگیر</option>
+            <option value="pensioner" ${selectedType === 'pensioner' ? 'selected' : ''}>وظیفه‌بگیر</option>
+        `;
+
+        let itemsHtml = '';
+        incomeItems.forEach(item => {
+            const existing = data?.items?.find(di => di.itemDefinitionId == item.id && di.isIncome);
+            const amount = existing ? existing.amount : '';
+            itemsHtml += `
+            <div class="form-group">
+                <label>${item.name} (درآمد)</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" data-is-income="1" value="${amount}" step="1000">
+            </div>`;
+        });
+        deductionItems.forEach(item => {
+            const existing = data?.items?.find(di => di.itemDefinitionId == item.id && !di.isIncome);
+            const amount = existing ? existing.amount : '';
+            itemsHtml += `
+            <div class="form-group">
+                <label>${item.name} (کسور)</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" data-is-income="0" value="${amount}" step="1000">
+            </div>`;
+        });
+
+        return `
+        <div class="card" style="border:2px solid var(--primary-light);">
+            <div class="card-header"><h3>${isEdit ? 'مشاهده' : 'صدور'} حکم</h3></div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>نوع *</label>
+                    <select id="dc_type" ${lockedPerson ? 'disabled' : ''}>${typeOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label>شخص *</label>
+                    <select id="dc_person_id" ${lockedPerson ? 'disabled' : ''}>
+                    </select>
+                </div>
+                <div class="form-group"><label>شماره حکم</label><input type="text" id="dc_decree_number" value="${data?.decreeNumber||''}" ${isEdit ? 'readonly' : ''}></div>
+                <div class="form-group"><label>عنوان حکم</label><input type="text" id="dc_title" value="${data?.title||''}" ${isEdit ? 'readonly' : ''}></div>
+                <div class="form-group"><label>تاریخ صدور</label><input type="text" id="dc_issue_date" value="${data?.issueDate||''}" placeholder="YYYY-MM-DD" ${isEdit ? 'readonly' : ''}></div>
+                <div class="form-group"><label>تاریخ اجرا</label><input type="text" id="dc_effective_from" value="${data?.effectiveFrom||''}" placeholder="YYYY-MM-DD" ${isEdit ? 'readonly' : ''}></div>
+            </div>
+            <div style="margin-top:16px;">
+                <h4>آیتم‌های حکم</h4>
+                <div class="form-grid" id="decreeItemsGrid">${itemsHtml}</div>
+            </div>
+            <div class="form-actions" style="margin-top:16px;">
+                ${!isEdit ? '<button class="btn btn-accent" id="btnSaveDecree">💾 ذخیره حکم</button>' : ''}
+                <button class="btn btn-ghost" id="btnCancelDecree">بازگشت</button>
+            </div>
         </div>`;
     }
 
@@ -494,5 +570,5 @@ const Templates = (() => {
         </div>`;
     }
 
-    return { headerButtons, tabNav, tabPanels, personForm, retireePensionerForm, dependentRow, personSearchBox, personInlineFields, salaryForm, itemForm, changelogModal };
+    return { headerButtons, tabNav, tabPanels, personForm, retireePensionerForm, dependentRow, personSearchBox, personInlineFields, decreeForm, salaryForm, itemForm, changelogModal };
 })();

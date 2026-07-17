@@ -8,8 +8,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.1
+ * @version     1.0.2
  * @history
+ * 1.0.2 (2026-07-16) - Implementing Decree
  * 1.0.1 (2026-07-14) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular 
  */
@@ -154,6 +155,37 @@ const DatabaseService = (() => {
             FOREIGN KEY (retiree_id) REFERENCES retirees(id) ON DELETE CASCADE );`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_dependents_person_id ON dependents (person_id);`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_dependents_retiree_id ON dependents (retiree_id);`);
+        
+        // Decrees
+        db.run(`
+            CREATE TABLE IF NOT EXISTS decrees (
+                id INTEGER PRIMARY KEY,
+                person_id INTEGER NOT NULL,
+                type TEXT NOT NULL DEFAULT 'retiree',
+                decree_number TEXT DEFAULT '',
+                title TEXT DEFAULT '',
+                issue_date TEXT DEFAULT '',
+                effective_from TEXT DEFAULT '',
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT '',
+                FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE RESTRICT
+            );
+        `);
+        db.run('CREATE INDEX IF NOT EXISTS idx_decrees_person_id ON decrees(person_id);');
+
+        // Decrees Items
+        db.run(`
+            CREATE TABLE IF NOT EXISTS decree_items (
+                id INTEGER PRIMARY KEY,
+                decree_id INTEGER NOT NULL,
+                item_definition_id INTEGER NOT NULL,
+                is_income INTEGER NOT NULL DEFAULT 1,
+                amount REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (decree_id) REFERENCES decrees(id) ON DELETE CASCADE,
+                FOREIGN KEY (item_definition_id) REFERENCES income_items(id) ON DELETE RESTRICT
+            );
+        `);
+        db.run('CREATE INDEX IF NOT EXISTS idx_decree_items_decree ON decree_items(decree_id);');
 
         db.run(`CREATE TABLE IF NOT EXISTS salary_records (
             id INTEGER PRIMARY KEY, retiree_id INTEGER NOT NULL, year INTEGER NOT NULL, month INTEGER NOT NULL,
@@ -185,8 +217,6 @@ const DatabaseService = (() => {
      * (Private helper)
      */
     function migrateIfNeeded() {
-        try { db.run('ALTER TABLE retirees ADD COLUMN children_count INTEGER DEFAULT 0'); } catch(e) {}
-        try { db.run('ALTER TABLE retirees ADD COLUMN has_spouse INTEGER DEFAULT 0'); } catch(e) {}
         // Add columns that might be missing from older schema
     }
 

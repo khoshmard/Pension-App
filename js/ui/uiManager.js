@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.1
+ * @version     1.0.2
  * @history
+ * 1.0.2 (2026-07-16) - Implementing Decree
  * 1.0.1 (2026-07-16) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
  */
@@ -51,6 +52,10 @@ const UIManager = (() => {
                 break;
             case 'retireesPensioners':
                 EventHandlers.loadRetireesPensioners();
+                break;
+            case 'decrees':
+                EventHandlers.populateDecreePersonFilter();
+                EventHandlers.loadDecrees();
                 break;
             case 'salaries':
                 EventHandlers.populateDropdowns();
