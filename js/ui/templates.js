@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.2
+ * @version     1.0.3
  * @history
+ * 1.0.3 (2026-07-17) - Improving Decree Items
  * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
@@ -445,8 +446,19 @@ const Templates = (() => {
         const selectedType = data?.type || prefillType;
         const lockedPerson = !!prefillPersonId || isEdit;
 
-        const incomeItems = ItemsRepository.getIncomes();
-        const deductionItems = ItemsRepository.getDeductions();
+        let incomeItems = [];
+        let deductionItems = [];
+        if (data && data.items) {
+            // Existing decree: use its items directly
+            data.items.forEach(item => {
+                if (item.isIncome) incomeItems.push(item);
+                else deductionItems.push(item);
+            });
+        } else {
+            // New decree: fetch current global items
+            incomeItems = ItemsRepository.getIncomes();
+            deductionItems = ItemsRepository.getDeductions();
+        }
 
         const typeOptions = `
             <option value="retiree" ${selectedType === 'retiree' ? 'selected' : ''}>مستمری‌بگیر</option>
@@ -455,8 +467,7 @@ const Templates = (() => {
 
         let itemsHtml = '';
         incomeItems.forEach(item => {
-            const existing = data?.items?.find(di => di.itemDefinitionId == item.id && di.isIncome);
-            const amount = existing ? existing.amount : '';
+            const amount = data ? item.amount : '';
             itemsHtml += `
             <div class="form-group">
                 <label>${item.name} (درآمد)</label>
@@ -464,8 +475,7 @@ const Templates = (() => {
             </div>`;
         });
         deductionItems.forEach(item => {
-            const existing = data?.items?.find(di => di.itemDefinitionId == item.id && !di.isIncome);
-            const amount = existing ? existing.amount : '';
+            const amount = data ? item.amount : '';
             itemsHtml += `
             <div class="form-group">
                 <label>${item.name} (کسور)</label>

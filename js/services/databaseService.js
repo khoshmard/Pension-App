@@ -8,8 +8,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.2
+ * @version     1.0.3
  * @history
+ * 1.0.3 (2026-07-17) - Improving Decree Items
  * 1.0.2 (2026-07-16) - Implementing Decree
  * 1.0.1 (2026-07-14) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular 
@@ -179,6 +180,8 @@ const DatabaseService = (() => {
                 id INTEGER PRIMARY KEY,
                 decree_id INTEGER NOT NULL,
                 item_definition_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                formula TEXT DEFAULT '',
                 is_income INTEGER NOT NULL DEFAULT 1,
                 amount REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY (decree_id) REFERENCES decrees(id) ON DELETE CASCADE,
@@ -218,6 +221,8 @@ const DatabaseService = (() => {
      */
     function migrateIfNeeded() {
         // Add columns that might be missing from older schema
+        try { db.run('ALTER TABLE decree_items ADD COLUMN name TEXT DEFAULT ""'); } catch(e) {}
+        try { db.run('ALTER TABLE decree_items ADD COLUMN formula TEXT DEFAULT ""'); } catch(e) {}
     }
 
     /**

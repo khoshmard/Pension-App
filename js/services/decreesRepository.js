@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.0
+ * @version     1.0.1
  * @history
+ * 1.0.1 (2026-07-17) - Improving Decree Items
  * 1.0.0 (2026-07-17) - Implementing Decree
  */
 
@@ -59,13 +60,15 @@ const DecreeRepository = (() => {
             items: []
         };
         // Fetch items
-        const itemsRes = db.exec('SELECT id, item_definition_id, is_income, amount FROM decree_items WHERE decree_id = ?', [decreeId]);
+        const itemsRes = db.exec('SELECT id, item_definition_id, name, formula, is_income, amount FROM decree_items WHERE decree_id = ?', [decreeId]);
         if (itemsRes.length && itemsRes[0].values.length) {
             decree.items = itemsRes[0].values.map(r => ({
                 id: r[0],
                 itemDefinitionId: r[1],
-                isIncome: r[2] === 1,
-                amount: r[3]
+                name: r[2],
+                formula: r[3],
+                isIncome: r[4] === 1,
+                amount: r[5]
             }));
         }
         return decree;
@@ -89,11 +92,24 @@ const DecreeRepository = (() => {
         const newId = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
         // Insert items
         if (decree.items && decree.items.length) {
+            const incomes = ItemsRepository.getIncomes();
+            const deductions = ItemsRepository.getDeductions();
+
             decree.items.forEach(item => {
-                db.run(`
-                    INSERT INTO decree_items (decree_id, item_definition_id, is_income, amount)
-                    VALUES (?,?,?,?)`,
-                    [newId, item.itemDefinitionId, item.isIncome ? 1 : 0, item.amount]);
+                let def;
+                if (item.isIncome) {
+                    def = incomes.find(i => i.id === item.itemDefinitionId);
+                } else {
+                    def = deductions.find(d => d.id === item.itemDefinitionId);
+                }
+                const name = def ? def.name : (item.isIncome ? 'درآمد' : 'کسور');
+                const formula = def ? def.formula : '';
+
+                db.run(
+                    `INSERT INTO decree_items (decree_id, item_definition_id, name, formula, is_income, amount)
+                    VALUES (?,?,?,?,?,?)`,
+                    [newId, item.itemDefinitionId, name, formula, item.isIncome ? 1 : 0, item.amount]
+                );
             });
         }
         return newId;
