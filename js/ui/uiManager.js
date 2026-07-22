@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.2
+ * @version     1.0.3
  * @history
+ * 1.0.3 (2026-07-17) - Implementing Unified Item
  * 1.0.2 (2026-07-16) - Implementing Decree
  * 1.0.1 (2026-07-16) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
@@ -69,7 +70,8 @@ const UIManager = (() => {
                 break;
             case 'settings':
                 EventHandlers.loadSettingsForm();
-                EventHandlers.loadItemsList();
+                EventHandlers.loadDecreeItemsList();
+                EventHandlers.loadPayslipItemsList();
                 break;
             // Export tab has no dynamic content to load
         }

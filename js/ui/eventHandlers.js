@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.2
+ * @version     1.0.3
  * @history
+ * 1.0.3 (2026-07-19) - Implementing Unified Item
  * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
  * 1.0.0 (2026-07-12) - Make App Modular
@@ -903,9 +904,6 @@ const EventHandlers = (() => {
         showToast('✅ پرداخت ثبت شد', 'success');
     }
 
-    // ----------------------------------------------------------------
-    // Payments, Items, Settings, Exports (mostly unchanged)
-    // ----------------------------------------------------------------
     function loadPayments() {
         const payments = PaymentsRepository.getAll();
         const monthNames = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
@@ -932,65 +930,108 @@ const EventHandlers = (() => {
         }
     }
 
-    function loadItemsList() {
-        const incomes = ItemsRepository.getIncomes();
-        const deductions = ItemsRepository.getDeductions();
-        const renderTable = (tbodyId, items, type) => {
+    // ----------------------------------------------------------------
+    // Settings, Items, Exports
+    // ----------------------------------------------------------------
+    function loadDecreeItemsList() {
+        const items = ItemsRepository.getDecreeItems();
+        const incomes = items.filter(i => i.isIncome);
+        const deductions = items.filter(i => !i.isIncome);
+
+        const renderTable = (tbodyId, arr) => {
             const tbody = document.getElementById(tbodyId);
-            if (items.length) {
-                tbody.innerHTML = items.map(item => `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td style="direction:ltr;font-family:monospace;">${item.formula}</td>
-                        <td>${item.sortOrder}</td>
-                        <td>
-                            <button class="btn btn-ghost btn-sm edit-item" data-id="${item.id}">✏️</button>
-                            <button class="btn btn-danger btn-sm delete-item" data-id="${item.id}">🗑️</button>
-                        </td>
-                    </tr>`).join('');
-            } else {
-                tbody.innerHTML = '<tr><td colspan="4">موردی تعریف نشده</td></tr>';
-            }
+            tbody.innerHTML = arr.length
+                ? arr.map(item => Templates.decreeItemRow(item)).join('')
+                : '<tr><td colspan="5">موردی تعریف نشده</td></tr>';
         };
-        renderTable('incomeItemsTable', incomes, 'income');
-        renderTable('deductionItemsTable', deductions, 'deduction');
+        renderTable('incomeItemsTable', incomes);
+        renderTable('deductionItemsTable', deductions);
     }
 
-    function showItemForm(type, itemId = null) {
+    function showDecreeItemForm(itemId = null) {
         let item = null;
-        if (itemId) {
-            const all = type === 'income' ? ItemsRepository.getIncomes() : ItemsRepository.getDeductions();
-            item = all.find(i => i.id == itemId);
-        }
-        document.body.insertAdjacentHTML('beforeend', Templates.itemForm(type, item));
-        const modal = document.getElementById('itemFormModal');
+        if (itemId) item = ItemsRepository.getById(parseInt(itemId));
+        document.body.insertAdjacentHTML('beforeend', Templates.decreeItemForm(item));
+        const modal = document.getElementById('decreeItemFormModal');
         modal.addEventListener('click', e => {
-            if (e.target === modal || e.target.id === 'btnCancelItem') modal.remove();
+            if (e.target === modal || e.target.id === 'btnCancelDecreeItem') modal.remove();
         });
-        document.getElementById('btnSaveItem').addEventListener('click', function () {
-            const itemData = {
-                id: this.dataset.id ? parseInt(this.dataset.id) : null,
-                name: document.getElementById('itemName').value.trim(),
-                formula: document.getElementById('itemFormula').value.trim(),
-                sortOrder: parseInt(document.getElementById('itemOrder').value) || 0
+        document.getElementById('btnSaveDecreeItem').addEventListener('click', function () {
+            const id = this.dataset.id ? parseInt(this.dataset.id) : null;
+            const data = {
+                id,
+                name: document.getElementById('diName').value.trim(),
+                formula: document.getElementById('diFormula').value.trim(),
+                isIncome: parseInt(document.getElementById('diIsIncome').value) === 1,
+                amount: parseFloat(document.getElementById('diAmount').value) || 0,
+                sortOrder: parseInt(document.getElementById('diOrder').value) || 0,
+                applicableEntity: document.getElementById('diEntity').value,
+                usageType: 'decree',
+                isRecurring: true
             };
-            if (!itemData.name) return showToast('❌ نام الزامی است', 'error');
-            if (type === 'income') ItemsRepository.saveIncome(itemData);
-            else ItemsRepository.saveDeduction(itemData);
+            if (!data.name) return showToast('❌ نام الزامی است', 'error');
+            ItemsRepository.save(data);
             if (window._persist) window._persist();
             modal.remove();
-            loadItemsList();
-            showToast('✅ آیتم ذخیره شد', 'success');
+            loadDecreeItemsList();
+            showToast('✅ آیتم حکم ذخیره شد', 'success');
         });
     }
 
-    function deleteItem(type, id) {
-        if (!confirm('حذف شود؟')) return;
-        if (type === 'income') ItemsRepository.deleteIncome(parseInt(id));
-        else ItemsRepository.deleteDeduction(parseInt(id));
+    function deleteDecreeItem(id) {
+        if (!confirm('آیا از حذف این آیتم حکم اطمینان دارید؟')) return;
+        ItemsRepository.remove(parseInt(id));
         if (window._persist) window._persist();
-        loadItemsList();
-        showToast('✅ حذف شد', 'success');
+        loadDecreeItemsList();
+        showToast('✅ آیتم حکم حذف شد', 'success');
+    }
+
+    function loadPayslipItemsList() {
+        const items = ItemsRepository.getPayslipItems();
+        const tbody = document.getElementById('payslipItemsTable');
+        tbody.innerHTML = items.length
+            ? items.map(item => Templates.payslipItemRow(item)).join('')
+            : '<tr><td colspan="6">آیتم فیش تعریف نشده</td></tr>';
+    }
+
+    function showPayslipItemForm(itemId = null) {
+        let item = null;
+        if (itemId) item = ItemsRepository.getById(parseInt(itemId));
+        document.body.insertAdjacentHTML('beforeend', Templates.payslipItemForm(item));
+        const modal = document.getElementById('payslipItemFormModal');
+        modal.addEventListener('click', e => {
+            if (e.target === modal || e.target.id === 'btnCancelPayslipItem') modal.remove();
+        });
+        document.getElementById('btnSavePayslipItem').addEventListener('click', function () {
+            const id = this.dataset.id ? parseInt(this.dataset.id) : null;
+            const data = {
+                id,
+                name: document.getElementById('piName').value.trim(),
+                isIncome: parseInt(document.getElementById('piIsIncome').value) === 1,
+                amount: parseFloat(document.getElementById('piAmount').value) || 0,
+                formula: document.getElementById('piFormula').value.trim(),
+                isRecurring: parseInt(document.getElementById('piRecurring').value) === 1,
+                sortOrder: parseInt(document.getElementById('piOrder').value) || 0,
+                initial: parseFloat(document.getElementById('piInitial').value) || 0,
+                balance: parseFloat(document.getElementById('piBalance').value) || 0,
+                usageType: 'payslip',
+                applicableEntity: 'all'   // payslip items are entity-agnostic for now
+            };
+            if (!data.name) return showToast('❌ نام الزامی است', 'error');
+            ItemsRepository.save(data);
+            if (window._persist) window._persist();
+            modal.remove();
+            loadPayslipItemsList();
+            showToast('✅ آیتم فیش ذخیره شد', 'success');
+        });
+    }
+
+    function deletePayslipItem(id) {
+        if (!confirm('آیا از حذف این آیتم فیش اطمینان دارید؟')) return;
+        ItemsRepository.remove(parseInt(id));
+        if (window._persist) window._persist();
+        loadPayslipItemsList();
+        showToast('✅ آیتم فیش حذف شد', 'success');
     }
 
     function loadSettingsForm() {
@@ -1145,15 +1186,21 @@ const EventHandlers = (() => {
 
         // Settings
         document.getElementById('btnSaveSettings').addEventListener('click', saveSettings);
-        document.getElementById('btnAddIncome').addEventListener('click', () => showItemForm('income'));
-        document.getElementById('btnAddDeduction').addEventListener('click', () => showItemForm('deduction'));
+        // Decree items
+        document.getElementById('btnAddDecreeItem').addEventListener('click', () => showDecreeItemForm());
         document.getElementById('incomeItemsTable').addEventListener('click', e => {
-            if (e.target.classList.contains('edit-item')) showItemForm('income', e.target.dataset.id);
-            else if (e.target.classList.contains('delete-item')) deleteItem('income', e.target.dataset.id);
+            if (e.target.classList.contains('edit-decree-item')) showDecreeItemForm(e.target.dataset.id);
+            else if (e.target.classList.contains('delete-decree-item')) deleteDecreeItem(e.target.dataset.id);
         });
         document.getElementById('deductionItemsTable').addEventListener('click', e => {
-            if (e.target.classList.contains('edit-item')) showItemForm('deduction', e.target.dataset.id);
-            else if (e.target.classList.contains('delete-item')) deleteItem('deduction', e.target.dataset.id);
+            if (e.target.classList.contains('edit-decree-item')) showDecreeItemForm(e.target.dataset.id);
+            else if (e.target.classList.contains('delete-decree-item')) deleteDecreeItem(e.target.dataset.id);
+        });
+        // Payslip items
+        document.getElementById('btnAddPayslipItem').addEventListener('click', () => showPayslipItemForm());
+        document.getElementById('payslipItemsTable').addEventListener('click', e => {
+            if (e.target.classList.contains('edit-payslip-item')) showPayslipItemForm(e.target.dataset.id);
+            else if (e.target.classList.contains('delete-payslip-item')) deletePayslipItem(e.target.dataset.id);
         });
     }
 
@@ -1168,7 +1215,8 @@ const EventHandlers = (() => {
         populateDecreePersonFilter,
         loadSalaryRecords,
         loadPayments,
-        loadItemsList,
+        loadDecreeItemsList,
+        loadPayslipItemsList,
         loadSettingsForm
     };
 })();

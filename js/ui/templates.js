@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.3
+ * @version     1.0.4
  * @history
+ * 1.0.4 (2026-07-20) - Implementing Unified Item
  * 1.0.3 (2026-07-17) - Improving Decree Items
  * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
@@ -204,10 +205,40 @@ const Templates = (() => {
                 </div>
                 <div class="form-actions"><button class="btn btn-accent" id="btnSaveSettings">💾 ذخیره</button></div>
             </div>
-            <div class="card" style="margin-top:20px;"><div class="card-header"><h3>آیتم‌ها</h3><div><button class="btn btn-accent btn-sm" id="btnAddIncome">➕ درآمد</button><button class="btn btn-accent btn-sm" id="btnAddDeduction">➕ کسور</button></div></div>
-                <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:300px;"><h4>📈 درآمدها</h4><div class="table-wrapper"><table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>عملیات</th></tr></thead><tbody id="incomeItemsTable"></tbody></table></div></div>
-                    <div style="flex:1; min-width:300px;"><h4>📉 کسورات</h4><div class="table-wrapper"><table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>عملیات</th></tr></thead><tbody id="deductionItemsTable"></tbody></table></div></div>
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header">
+                    <h3>آیتم‌های حکم</h3>
+                    <div>
+                        <button class="btn btn-accent btn-sm" id="btnAddDecreeItem">➕ افزودن آیتم حکم</button>
+                    </div>
+                </div>
+                <div style="flex:1; min-width:300px;">
+                    <h4>📈 درآمدها</h4>
+                    <div class="table-wrapper">
+                        <table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
+                            <tbody id="incomeItemsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div style="flex:1; min-width:300px;">
+                    <h4>📉 کسورات</h4>
+                    <div class="table-wrapper">
+                        <table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
+                            <tbody id="deductionItemsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header">
+                    <h3>آیتم‌های فیش</h3>
+                    <button class="btn btn-accent btn-sm" id="btnAddPayslipItem">➕ افزودن آیتم فیش</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>نام</th><th>نوع</th><th>مبلغ پیش‌فرض</th><th>تکرارشونده</th><th>ترتیب</th><th>عملیات</th></tr></thead>
+                        <tbody id="payslipItemsTable"></tbody>
+                    </table>
                 </div>
             </div>
         </div>`;
@@ -432,9 +463,6 @@ const Templates = (() => {
     // ------------------------------------------------------------------
     /**
      * Generates the decree add/edit form.
-     * @param {Array} persons - List of retirees/pensioners (for person selection).
-     * @param {Array} incomeItems - All active income items.
-     * @param {Array} deductionItems - All active deduction items.
      * @param {Object|null} data - Existing decree object
      * @param {number} prefillPersonId - Existing Person Id
      * @param {number} prefillType - Existing Person Type
@@ -456,8 +484,9 @@ const Templates = (() => {
             });
         } else {
             // New decree: fetch current global items
-            incomeItems = ItemsRepository.getIncomes();
-            deductionItems = ItemsRepository.getDeductions();
+            const decreeItems = ItemsRepository.getDecreeItems(prefillType);
+            incomeItems = decreeItems.filter(i => i.isIncome);
+            deductionItems = decreeItems.filter(i => !i.isIncome);
         }
 
         const typeOptions = `
@@ -531,27 +560,116 @@ const Templates = (() => {
         </div>`;
     }
 
+    // ------------------------------------------------------------------
+    // Settings 
+    // ------------------------------------------------------------------
+    function decreeItemRow(item) {
+        const entityLabel = item.applicableEntity === 'retiree' ? 'مستمری‌بگیر' :
+                        item.applicableEntity === 'pensioner' ? 'وظیفه‌بگیر' : 'همه';
+        return `
+        <tr>
+            <td>${item.name}</td>
+            <td style="direction:ltr;font-family:monospace;">${item.formula}</td>
+            <td>${item.sortOrder}</td>
+            <td>${entityLabel}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm edit-decree-item" data-id="${item.id}">✏️</button>
+                <button class="btn btn-danger btn-sm delete-decree-item" data-id="${item.id}">🗑️</button>
+            </td>
+        </tr>`;
+    }
+    
+    function payslipItemRow(item) {
+        return `
+        <tr>
+            <td>${item.name}</td>
+            <td>${item.isIncome ? 'درآمد' : 'کسور'}</td>
+            <td>${(item.amount || 0).toLocaleString('fa-IR')}</td>
+            <td>${item.isRecurring ? 'بله' : 'خیر'}</td>
+            <td>${item.sortOrder}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm edit-payslip-item" data-id="${item.id}">✏️</button>
+                <button class="btn btn-danger btn-sm delete-payslip-item" data-id="${item.id}">🗑️</button>
+            </td>
+        </tr>`;
+    }
+
     /**
-     * Generates the item (income/deduction) editing modal.
-     * @param {string} type - "income" or "deduction".
+     * Generates the item editing modal.
      * @param {Object|null} item - Existing item data (optional).
      * @returns {string} Modal HTML.
      */
-    function itemForm(type, item = null) {
-        const title = type === 'income' ? 'درآمد' : 'کسور';
+    function decreeItemForm(item = null) {
         return `
-        <div class="modal-overlay" id="itemFormModal">
+        <div class="modal-overlay" id="decreeItemFormModal">
             <div class="modal">
-                <h3>${item ? '✏️ ویرایش' : '➕ افزودن'} آیتم ${title}</h3>
+                <h3>${item ? '✏️ ویرایش' : '➕ افزودن'} آیتم حکم</h3>
                 <div class="form-grid">
-                    <div class="form-group"><label>نام</label><input type="text" id="itemName" value="${item?.name || ''}"></div>
-                    <div class="form-group"><label>فرمول</label><input type="text" id="itemFormula" value="${item?.formula || '0'}"></div>
-                    <div class="form-group"><label>ترتیب</label><input type="number" id="itemOrder" value="${item?.sortOrder || 0}" min="0"></div>
+                    <div class="form-group"><label>نام</label><input type="text" id="diName" value="${item?.name || ''}"></div>
+                    <div class="form-group"><label>نوع</label>
+                        <select id="diIsIncome">
+                            <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>
+                            <option value="0" ${item?.isIncome === false ? 'selected' : ''}>کسور</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>فرمول</label><input type="text" id="diFormula" value="${item?.formula || '0'}"></div>
+                    <div class="form-group"><label>مبلغ (پیش‌فرض)</label><input type="number" id="diAmount" value="${item?.amount || 0}" step="1000"></div>
+                    <div class="form-group"><label>ترتیب</label><input type="number" id="diOrder" value="${item?.sortOrder || 0}" min="0"></div>
+                    <div class="form-group">
+                        <label>نوع حکم</label>
+                        <select id="diEntity">
+                            <option value="all" ${item?.applicableEntity === 'all' ? 'selected' : ''}>همه</option>
+                            <option value="retiree" ${item?.applicableEntity === 'retiree' ? 'selected' : ''}>مستمری‌بگیر</option>
+                            <option value="pensioner" ${item?.applicableEntity === 'pensioner' ? 'selected' : ''}>وظیفه‌بگیر</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="display:none;">
+                        <label>نوع درآمد</label>
+                        <select id="diIsIncome">
+                            <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>
+                            <option value="0" ${item?.isIncome === false ? 'selected' : ''}>کسور</option>
+                        </select>
+                    </div>
                 </div>
                 <small style="color:var(--text-muted); display:block; margin-top:4px;">متغیرها: avgSalary, serviceYears, effectiveYears, minWage, maxYears, children, spouse, totalIncome (در کسورات)</small>
                 <div class="form-actions">
-                    <button class="btn btn-accent" id="btnSaveItem" data-type="${type}" data-id="${item?.id || ''}">💾 ذخیره</button>
-                    <button class="btn btn-ghost" id="btnCancelItem">انصراف</button>
+                    <button class="btn btn-accent" id="btnSaveDecreeItem" data-id="${item?.id || ''}">💾 ذخیره</button>
+                    <button class="btn btn-ghost" id="btnCancelDecreeItem">انصراف</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function payslipItemForm(item = null) {
+        return `
+        <div class="modal-overlay" id="payslipItemFormModal">
+            <div class="modal">
+                <h3>${item ? '✏️ ویرایش' : '➕ افزودن'} آیتم فیش</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>نام</label><input type="text" id="piName" value="${item?.name || ''}"></div>
+                    <div class="form-group"><label>نوع</label>
+                        <select id="piIsIncome">
+                            <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>
+                            <option value="0" ${item?.isIncome === false ? 'selected' : ''}>کسور</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>مبلغ</label><input type="number" id="piAmount" value="${item?.amount || 0}" step="1000"></div>
+                    <div class="form-group"><label>فرمول (اختیاری)</label><input type="text" id="piFormula" value="${item?.formula || ''}"></div>
+                    <div class="form-group">
+                        <label>تکرارشونده</label>
+                        <select id="piRecurring">
+                            <option value="1" ${item?.isRecurring !== false ? 'selected' : ''}>بله</option>
+                            <option value="0" ${item?.isRecurring === false ? 'selected' : ''}>خیر</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>ترتیب</label><input type="number" id="piOrder" value="${item?.sortOrder || 0}" min="0"></div>
+                    <!-- Hidden for now -->
+                    <input type="hidden" id="piInitial" value="${item?.initial || 0}">
+                    <input type="hidden" id="piBalance" value="${item?.balance || 0}">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-accent" id="btnSavePayslipItem" data-id="${item?.id || ''}">💾 ذخیره</button>
+                    <button class="btn btn-ghost" id="btnCancelPayslipItem">انصراف</button>
                 </div>
             </div>
         </div>`;
@@ -580,5 +698,5 @@ const Templates = (() => {
         </div>`;
     }
 
-    return { headerButtons, tabNav, tabPanels, personForm, retireePensionerForm, dependentRow, personSearchBox, personInlineFields, decreeForm, salaryForm, itemForm, changelogModal };
+    return { headerButtons, tabNav, tabPanels, personForm, retireePensionerForm, dependentRow, personSearchBox, personInlineFields, decreeForm, salaryForm, decreeItemForm, payslipItemForm, decreeItemRow, payslipItemRow, changelogModal };
 })();

@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.1
+ * @version     1.0.2
  * @history
+ * 1.0.2 (2026-07-20) - Implementing Unified Item
  * 1.0.1 (2026-07-17) - Improving Decree Items
  * 1.0.0 (2026-07-17) - Implementing Decree
  */
@@ -92,16 +93,10 @@ const DecreeRepository = (() => {
         const newId = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
         // Insert items
         if (decree.items && decree.items.length) {
-            const incomes = ItemsRepository.getIncomes();
-            const deductions = ItemsRepository.getDeductions();
+            const allDecreeItems = ItemsRepository.getByUsage(['decree']);
 
             decree.items.forEach(item => {
-                let def;
-                if (item.isIncome) {
-                    def = incomes.find(i => i.id === item.itemDefinitionId);
-                } else {
-                    def = deductions.find(d => d.id === item.itemDefinitionId);
-                }
+                const def = allDecreeItems.find(d => d.id === item.itemDefinitionId);
                 const name = def ? def.name : (item.isIncome ? 'درآمد' : 'کسور');
                 const formula = def ? def.formula : '';
 
