@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.5
+ * @version     1.0.6
  * @history
+ * 1.0.6 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.5 (2026-07-23) - Payslip UI
  * 1.0.4 (2026-07-20) - Implementing Unified Item
  * 1.0.3 (2026-07-17) - Improving Decree Items
@@ -197,6 +198,9 @@ const Templates = (() => {
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <button class="btn btn-outline btn-sm" id="btnAddItemToAll">➕ افزودن آیتم به همه</button>
+                        </div>  
+                        <div class="form-group" style="margin-bottom:0;">
+                            <button class="btn btn-accent btn-sm" id="btnConfirmAll">✔️ تأیید همه</button>
                         </div>                    
                     </div>
                 </div>
@@ -625,6 +629,9 @@ const Templates = (() => {
     function payslipRow(ps, index) {
         const statusText = ps.status === 0 ? 'محاسبه شده' : 'تأیید شده';
         const statusColor = ps.status === 0 ? 'orange' : 'green';
+        const confirmBtn = ps.status === 0 
+            ? `<button class="btn btn-accent btn-sm confirm-payslip" data-id="${ps.id}">✔️ تأیید</button>` 
+            : '';
         return `
         <tr>
             <td>${index + 1}</td>
@@ -639,6 +646,7 @@ const Templates = (() => {
             <td>
                 <button class="btn btn-ghost btn-sm view-payslip" data-id="${ps.id}">👁️</button>
                 <button class="btn btn-outline btn-sm add-item-payslip" data-id="${ps.id}">➕ آیتم</button>
+                ${confirmBtn}
                 <button class="btn btn-danger btn-sm delete-payslip" data-id="${ps.id}" ${ps.status===1?'disabled':''}>🗑️</button>
             </td>
         </tr>`;

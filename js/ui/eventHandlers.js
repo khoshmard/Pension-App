@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.4
+ * @version     1.0.5
  * @history
+ * 1.0.5 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.4 (2026-07-23) - Payslip UI
  * 1.0.3 (2026-07-19) - Implementing Unified Item
  * 1.0.2 (2026-07-17) - Implementing Decree
@@ -1066,6 +1067,35 @@ const EventHandlers = (() => {
         });
     }
 
+    function confirmPayslip(payslipId) {
+        if (!confirm('آیا از تأیید این فیش اطمینان دارید؟ پس از تأیید قابل ویرایش نیست.')) return;
+        const success = PayslipRepository.confirm(payslipId);
+        if (success) {
+            if (window._persist) window._persist();
+            loadPayslips();
+            showToast('✅ فیش تأیید شد', 'success');
+        } else {
+            showToast('❌ تأیید ناموفق', 'error');
+        }
+    }
+
+    function confirmAllPayslips() {
+        const year = parseInt(document.getElementById('psYear').value);
+        const month = parseInt(document.getElementById('psMonth').value);
+        if (!year || !month) return showToast('❌ سال و ماه را انتخاب کنید', 'error');
+        const payslips = PayslipRepository.getByFilters({ year, month });
+        const unconfirmed = payslips.filter(ps => ps.status === PayslipRepository.STATUS.CALCULATED);
+        if (unconfirmed.length === 0) return showToast('همه فیش‌ها قبلاً تأیید شده‌اند.', 'success');
+        if (!confirm(`آیا از تأیید ${unconfirmed.length} فیش اطمینان دارید؟`)) return;
+        let count = 0;
+        unconfirmed.forEach(ps => {
+            if (PayslipRepository.confirm(ps.id)) count++;
+        });
+        if (window._persist) window._persist();
+        loadPayslips();
+        showToast(`✅ ${count} فیش تأیید شد`, 'success');
+    }
+
     // ----------------------------------------------------------------
     // Settings, Items, Exports
     // ----------------------------------------------------------------
@@ -1309,6 +1339,7 @@ const EventHandlers = (() => {
 
         // Payslips tab
         document.getElementById('btnCalculateAll').addEventListener('click', calculateAllPayslips);
+        document.getElementById('btnConfirmAll').addEventListener('click', confirmAllPayslips);
         document.getElementById('btnRefreshPayslips').addEventListener('click', loadPayslips);
         document.getElementById('payslipsTableBody').addEventListener('click', e => {
             const btn = e.target.closest('button');
@@ -1317,6 +1348,7 @@ const EventHandlers = (() => {
             if (btn.classList.contains('view-payslip')) viewPayslip(id);
             else if (btn.classList.contains('delete-payslip')) deletePayslip(id);
             else if (btn.classList.contains('add-item-payslip')) showAddItemForm(id, false);
+            else if (btn.classList.contains('confirm-payslip')) confirmPayslip(e.target.dataset.id);
         });
         document.getElementById('btnAddItemToAll').addEventListener('click', () => showAddItemForm(null, true));
 

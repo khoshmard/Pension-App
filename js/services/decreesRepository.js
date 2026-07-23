@@ -4,9 +4,10 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.3
+ * @version     1.0.4
  * @history
- * 1.0.0 (2026-07-23) - payslip bulk calculation engine
+ * 1.0.4 (2026-07-23) - Calculating Arrears and Confirmation
+ * 1.0.3 (2026-07-23) - Payslip Bulk Calculation Engine
  * 1.0.2 (2026-07-20) - Implementing Unified Item
  * 1.0.1 (2026-07-17) - Improving Decree Items
  * 1.0.0 (2026-07-17) - Implementing Decree
@@ -129,6 +130,24 @@ const DecreeRepository = (() => {
     }
 
     /**
+     * Returns the decree that was active immediately before the given decree (by effective_from).
+     * @param {number} personId
+     * @param {number} currentDecreeId - ID of the current decree
+     * @returns {Object|null} Previous decree with items, or null.
+     */
+    function getPreviousDecreeWithItems(personId, currentDecreeId) {
+        const db = DatabaseService.getDB();
+        // Find decrees for this person that are older than the current one, ordered by effective_from descending.
+        const res = db.exec(
+            `SELECT id FROM decrees WHERE person_id = ? AND id != ? ORDER BY effective_from DESC, id DESC LIMIT 1`,
+            [personId, currentDecreeId]
+        );
+        if (!res.length || !res[0].values.length) return null;
+        const prevId = res[0].values[0][0];
+        return getById(prevId);
+    }
+
+    /**
      * Soft-deletes a decree (sets is_active = 0).
      * @param {number} decreeId
      */
@@ -137,5 +156,5 @@ const DecreeRepository = (() => {
         db.run('UPDATE decrees SET is_active = 0 WHERE id = ?', [decreeId]);
     }
 
-    return { getByPersonId, getById, add, getActiveDecreeWithItems, softDelete };
+    return { getByPersonId, getById, add, getActiveDecreeWithItems, getPreviousDecreeWithItems, softDelete };
 })();

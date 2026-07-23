@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.0
+ * @version     1.0.1
  * @history
+ * 1.0.1 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.0 (2026-07-23) - Implementing Payslip Model
  */
 
@@ -171,6 +172,20 @@ const PayslipRepository = (() => {
         return null;
     }
 
+    /**
+     * Confirms a payslip (sets status = CONFIRMED). Only works if currently CALCULATED.
+     * @param {number} payslipId
+     * @returns {boolean} success
+     */
+    function confirm(payslipId) {
+        const db = DatabaseService.getDB();
+        const row = db.exec('SELECT status FROM payslips WHERE id = ?', [payslipId]);
+        if (!row.length || !row[0].values.length) return false;
+        if (row[0].values[0][0] !== STATUS.CALCULATED) return false;
+        db.run('UPDATE payslips SET status = ? WHERE id = ?', [STATUS.CONFIRMED, payslipId]);
+        return true;
+    }
+
     return {
         STATUS,
         SOURCE,
@@ -179,6 +194,7 @@ const PayslipRepository = (() => {
         add,
         addItem,
         remove,
-        findExisting
+        findExisting,
+        confirm
     };
 })();
