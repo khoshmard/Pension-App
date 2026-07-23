@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.4
+ * @version     1.0.5
  * @history
+ * 1.0.5 (2026-07-23) - Payslip UI
  * 1.0.4 (2026-07-20) - Implementing Unified Item
  * 1.0.3 (2026-07-17) - Improving Decree Items
  * 1.0.2 (2026-07-17) - Implementing Decree
@@ -34,8 +35,8 @@ const Templates = (() => {
      * @returns {string}
      */
     function tabNav() {
-        const tabs = ['dashboard', 'persons', 'retireesPensioners', 'decrees', 'salaries', 'calc', 'payments', 'export', 'settings'];
-        const labels = ['📊 داشبورد', '👥 اشخاص', '🧓 بازنشستگان/وظیفه‌بگیران', '📜 احکام', '💰 سوابق حقوق', '🧮 محاسبه', '📋 پرداخت‌ها', '📤 CSV', '⚙️ تنظیمات'];
+        const tabs = ['dashboard', 'persons', 'retireesPensioners', 'decrees', 'salaries', 'calc', 'payslips', 'payments', 'export', 'settings'];
+        const labels = ['📊 داشبورد', '👥 اشخاص', '🧓 بازنشستگان/وظیفه‌بگیران', '📜 احکام', '💰 سوابق حقوق', '🧮 محاسبه', '📋 فیش حقوقی', '📋 پرداخت‌ها', '📤 CSV', '⚙️ تنظیمات'];
         return tabs.map((t, i) => `<button class="tab-btn ${i === 0 ? 'active' : ''}" data-tab="${t}">${labels[i]}</button>`).join('');
     }
 
@@ -170,6 +171,58 @@ const Templates = (() => {
                 <div class="table-wrapper"><table><thead><tr><th>شرح</th><th>مبلغ</th><th>نوع</th></tr></thead><tbody id="calcResultBody"></tbody></table></div>
                 <div class="form-actions"><button class="btn btn-accent" id="btnSavePayment">💾 ثبت پرداخت</button><button class="btn btn-outline" id="btnExportCalcCSV">📤 CSV</button></div>
             </div>
+        </div>
+
+        <!-- Payslips Tab -->
+        <div class="tab-panel" id="panel-payslips">
+            <div class="card">
+                <div class="card-header">
+                    <h3>محاسبه گروهی فیش حقوقی</h3>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>سال</label>
+                            <input type="number" id="psYear" value="1404" min="1390" max="1430" style="width:100px;">                  
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>ماه</label>
+                            <select id="psMonth" style="width:120px;">
+                                <option value="1">فروردین</option><option value="2">اردیبهشت</option><option value="3">خرداد</option>
+                                <option value="4">تیر</option><option value="5">مرداد</option><option value="6">شهریور</option>
+                                <option value="7">مهر</option><option value="8">آبان</option><option value="9">آذر</option>
+                                <option value="10">دی</option><option value="11">بهمن</option><option value="12">اسفند</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <button class="btn btn-accent btn-sm" id="btnCalculateAll">📊 محاسبه همه</button>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <button class="btn btn-outline btn-sm" id="btnAddItemToAll">➕ افزودن آیتم به همه</button>
+                        </div>                    
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header">
+                    <h3>لیست فیش‌ها</h3>
+                    <button class="btn btn-ghost btn-sm" id="btnRefreshPayslips">🔄 تازه‌سازی</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ردیف</th><th>کد ملی</th><th>نام</th><th>نام خانوادگی</th>
+                                <th>نوع</th><th>ناخالص</th><th>کسورات</th><th>خالص</th>
+                                <th>وضعیت</th><th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payslipsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Container for detail modal or inline form -->
+            <div id="payslipDetailContainer" style="display:none;"></div>
         </div>
 
         <!-- Payments Tab -->
@@ -561,6 +614,117 @@ const Templates = (() => {
     }
 
     // ------------------------------------------------------------------
+    // Payslips
+    // ------------------------------------------------------------------
+    /**
+     * Generates a row for the payslip list.
+     * @param {Object} ps - payslip object from repository (with joined person name/code)
+     * @param {number} index - row index
+     * @returns {string}
+     */
+    function payslipRow(ps, index) {
+        const statusText = ps.status === 0 ? 'محاسبه شده' : 'تأیید شده';
+        const statusColor = ps.status === 0 ? 'orange' : 'green';
+        return `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${ps.nationalCode || '-'}</td>
+            <td>${ps.firstName || ''}</td>
+            <td>${ps.lastName || ''}</td>
+            <td>${ps.type === 'retiree' ? 'مستمری‌بگیر' : 'وظیفه‌بگیر'}</td>
+            <td class="amount-cell">${ps.totalGross.toLocaleString('fa-IR')}</td>
+            <td class="amount-cell">(${ps.totalDeductions.toLocaleString('fa-IR')})</td>
+            <td class="amount-cell" style="font-weight:bold;">${ps.netAmount.toLocaleString('fa-IR')}</td>
+            <td style="color:${statusColor};">${statusText}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm view-payslip" data-id="${ps.id}">👁️</button>
+                <button class="btn btn-outline btn-sm add-item-payslip" data-id="${ps.id}">➕ آیتم</button>
+                <button class="btn btn-danger btn-sm delete-payslip" data-id="${ps.id}" ${ps.status===1?'disabled':''}>🗑️</button>
+            </td>
+        </tr>`;
+    }
+
+    /**
+     * Generates the detail view of a payslip (modal or card).
+     * @param {Object} ps - payslip with items
+     * @returns {string}
+     */
+    function payslipDetail(ps) {
+        let itemsHtml = '';
+        ps.items.forEach(item => {
+            const sourceLabels = {1:'حکم', 2:'فیش', 3:'معوقه'};
+            const sign = item.isIncome ? '' : '-';
+            itemsHtml += `
+            <tr>
+                <td>${item.name}</td>
+                <td class="amount-cell">${sign}${item.amount.toLocaleString('fa-IR')}</td>
+                <td>${item.isIncome ? 'درآمد' : 'کسور'}</td>
+                <td>${sourceLabels[item.source] || '-'}</td>
+            </tr>`;
+        });
+        const statusText = ps.status === 0 ? 'محاسبه شده' : 'تأیید شده';
+        return `
+        <div class="card" id="payslipDetailCard">
+            <div class="card-header">
+                <h3>جزئیات فیش ${ps.firstName} ${ps.lastName} - ${ps.calcYear}/${ps.calcMonth}</h3>
+                <span class="badge">${statusText}</span>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>شرح</th><th>مبلغ (ریال)</th><th>نوع</th><th>منبع</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+            <div style="margin-top:12px; display:flex; justify-content:space-between;">
+                <span><strong>ناخالص:</strong> ${ps.totalGross.toLocaleString('fa-IR')}</span>
+                <span><strong>کسورات:</strong> (${ps.totalDeductions.toLocaleString('fa-IR')})</span>
+                <span style="font-size:1.2rem;"><strong>خالص:</strong> ${ps.netAmount.toLocaleString('fa-IR')}</span>
+            </div>
+            <button class="btn btn-ghost" onclick="document.getElementById('payslipDetailContainer').style.display='none'; document.getElementById('payslipDetailContainer').innerHTML='';">بستن</button>
+        </div>`;
+    }
+
+    /**
+     * Generates the form for adding a payslip item to a single or bulk payslips.
+     * @param {Object} options - { payslipId (optional), bulk (boolean) }
+     * @returns {string}
+     */
+    function addPayslipItemForm(options = {}) {
+        const payslipItems = ItemsRepository.getPayslipItems(); // all active payslip items
+        let optionsHtml = payslipItems.map(item =>
+            `<option value="${item.id}">${item.name} (${item.isIncome ? 'درآمد' : 'کسور'})</option>`
+        ).join('');
+        return `
+        <div class="modal-overlay" id="addItemModal">
+            <div class="modal">
+                <h3>افزودن آیتم فیش</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>آیتم</label>
+                        <select id="selectPayslipItem">${optionsHtml}</select>
+                    </div>
+                    <div class="form-group">
+                        <label>مبلغ</label>
+                        <input type="number" id="addItemAmount" value="0" step="1000">
+                    </div>
+                    <div class="form-group" id="bulkTarget" style="display:${options.bulk ? 'block' : 'none'};">
+                        <label>اعمال به</label>
+                        <select id="bulkScope">
+                            <option value="all">همه فیش‌های محاسبه شده</option>
+                            <option value="retiree">فقط مستمری‌بگیران</option>
+                            <option value="pensioner">فقط وظیفه‌بگیران</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-accent" id="btnConfirmAddItem">💾 افزودن</button>
+                    <button class="btn btn-ghost" id="btnCancelAddItem">انصراف</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ------------------------------------------------------------------
     // Settings 
     // ------------------------------------------------------------------
     function decreeItemRow(item) {
@@ -698,5 +862,23 @@ const Templates = (() => {
         </div>`;
     }
 
-    return { headerButtons, tabNav, tabPanels, personForm, retireePensionerForm, dependentRow, personSearchBox, personInlineFields, decreeForm, salaryForm, decreeItemForm, payslipItemForm, decreeItemRow, payslipItemRow, changelogModal };
+    return {
+        headerButtons,
+        tabNav,
+        tabPanels,
+        personForm,
+        retireePensionerForm,
+        dependentRow,
+        personSearchBox,
+        personInlineFields,
+        decreeForm,
+        salaryForm,
+        decreeItemForm,
+        payslipItemForm,
+        decreeItemRow,
+        payslipItemRow,
+        payslipRow,
+        payslipDetail,
+        addPayslipItemForm,
+        changelogModal };
 })();

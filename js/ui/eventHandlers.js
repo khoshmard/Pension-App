@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.3
+ * @version     1.0.4
  * @history
+ * 1.0.4 (2026-07-23) - Payslip UI
  * 1.0.3 (2026-07-19) - Implementing Unified Item
  * 1.0.2 (2026-07-17) - Implementing Decree
  * 1.0.1 (2026-07-15) - Split Retiree into Person, Retiree, Pensioner and add Dependent
@@ -931,6 +932,141 @@ const EventHandlers = (() => {
     }
 
     // ----------------------------------------------------------------
+    // Payslips Tab
+    // ----------------------------------------------------------------
+    function loadPayslips() {
+        const year = parseInt(document.getElementById('psYear').value);
+        const month = parseInt(document.getElementById('psMonth').value);
+        if (!year || !month) return;
+
+        const payslips = PayslipRepository.getByFilters({ year, month });
+        // Augment with person data
+        const augmented = payslips.map(ps => {
+            const person = PersonsRepository.getById(ps.personId);
+            // determine type by checking retirees/pensioners (simplified: we can store type in payslip? no, we need to infer)
+            // We'll fetch from RetireesRepository and PensionersRepository
+            let type = 'retiree';
+            let firstName = person?.firstName || '';
+            let lastName = person?.lastName || '';
+            let nationalCode = person?.nationalCode || '';
+            // Check if person is a retiree or pensioner (we can look up by personId)
+            const retiree = RetireesRepository.getAll().find(r => r.personId === ps.personId);
+            if (retiree) type = 'retiree';
+            const pensioner = PensionersRepository.getAll().find(p => p.personId === ps.personId);
+            if (pensioner) type = 'pensioner';
+            return { ...ps, firstName, lastName, nationalCode, type };
+        });
+
+        const tbody = document.getElementById('payslipsTableBody');
+        if (augmented.length) {
+            tbody.innerHTML = augmented.map((ps, i) => Templates.payslipRow(ps, i)).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="10" class="empty-state">فیشی برای این ماه وجود ندارد</td></tr>';
+        }
+    }
+
+    function calculateAllPayslips() {
+        const year = parseInt(document.getElementById('psYear').value);
+        const month = parseInt(document.getElementById('psMonth').value);
+        if (!year || !month) return showToast('❌ سال و ماه را انتخاب کنید', 'error');
+
+        if (!confirm(`آیا از محاسبه گروهی فیش‌های حقوق برای ${year}/${month} اطمینان دارید؟`)) return;
+
+        const result = PayslipCalculator.calculateAll(year, month);
+        showToast(`✅ ${result.created} فیش محاسبه شد. ${result.skipped} مورد رد شد.`, 'success');
+        if (result.errors.length) {
+            console.warn('Payslip calculation errors:', result.errors);
+        }
+        loadPayslips();
+    }
+
+    function viewPayslip(payslipId) {
+        const ps = PayslipRepository.getById(payslipId);
+        if (!ps) return showToast('فیش یافت نشد', 'error');
+        // Add person data
+        const person = PersonsRepository.getById(ps.personId);
+        const type = (RetireesRepository.getAll().some(r => r.personId === ps.personId)) ? 'retiree' : 'pensioner';
+        const detail = { ...ps, firstName: person.firstName, lastName: person.lastName, type, nationalCode: person.nationalCode };
+        const container = document.getElementById('payslipDetailContainer');
+        container.innerHTML = Templates.payslipDetail(detail);
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deletePayslip(payslipId) {
+        if (!confirm('آیا از حذف این فیش اطمینان دارید؟')) return;
+        const success = PayslipRepository.remove(payslipId);
+        if (success) {
+            if (window._persist) window._persist();
+            loadPayslips();
+            showToast('✅ فیش حذف شد', 'success');
+        } else {
+            showToast('❌ فقط فیش‌های محاسبه شده قابل حذف هستند', 'error');
+        }
+    }
+
+    function showAddItemForm(payslipId = null, bulk = false) {
+        document.body.insertAdjacentHTML('beforeend', Templates.addPayslipItemForm({ payslipId, bulk }));
+        const modal = document.getElementById('addItemModal');
+        modal.addEventListener('click', e => {
+            if (e.target === modal || e.target.id === 'btnCancelAddItem') modal.remove();
+        });
+
+        document.getElementById('btnConfirmAddItem').addEventListener('click', function () {
+            const itemDefId = parseInt(document.getElementById('selectPayslipItem').value);
+            const amount = parseFloat(document.getElementById('addItemAmount').value) || 0;
+            if (!itemDefId) return showToast('❌ آیتم را انتخاب کنید', 'error');
+
+            const itemDef = ItemsRepository.getById(itemDefId);
+            if (!itemDef) return showToast('آیتم نامعتبر', 'error');
+
+            const itemData = {
+                name: itemDef.name,
+                formula: itemDef.formula,
+                amount: amount || itemDef.amount,
+                isIncome: itemDef.isIncome,
+                source: PayslipRepository.SOURCE.PAYSLIP_ITEM,
+                referenceId: itemDef.id
+            };
+
+            if (bulk) {
+                const scope = document.getElementById('bulkScope').value;
+                const year = parseInt(document.getElementById('psYear').value);
+                const month = parseInt(document.getElementById('psMonth').value);
+                let filters = { year, month };
+                if (scope === 'retiree' || scope === 'pensioner') {
+                    // we need to filter payslips by type; we'll get all and filter
+                    const all = PayslipRepository.getByFilters({ year, month });
+                    let targetIds = [];
+                    for (const ps of all) {
+                        const person = PersonsRepository.getById(ps.personId);
+                        const isRetiree = RetireesRepository.getAll().some(r => r.personId === ps.personId);
+                        if (scope === 'retiree' && isRetiree) targetIds.push(ps.id);
+                        else if (scope === 'pensioner' && !isRetiree) targetIds.push(ps.id);
+                    }
+                    for (const id of targetIds) {
+                        PayslipRepository.addItem(id, itemData);
+                    }
+                } else {
+                    // all
+                    const all = PayslipRepository.getByFilters({ year, month });
+                    for (const ps of all) {
+                        PayslipRepository.addItem(ps.id, itemData);
+                    }
+                }
+            } else if (payslipId) {
+                const success = PayslipRepository.addItem(payslipId, itemData);
+                if (!success) return showToast('❌ امکان افزودن آیتم وجود ندارد (فیش تأیید شده است)', 'error');
+            }
+
+            if (window._persist) window._persist();
+            modal.remove();
+            loadPayslips();
+            showToast('✅ آیتم افزوده شد', 'success');
+        });
+    }
+
+    // ----------------------------------------------------------------
     // Settings, Items, Exports
     // ----------------------------------------------------------------
     function loadDecreeItemsList() {
@@ -1171,6 +1307,23 @@ const EventHandlers = (() => {
         document.getElementById('btnSavePayment').addEventListener('click', savePayment);
         document.getElementById('btnExportCalcCSV').addEventListener('click', () => Exports.calcCSV(currentCalcResult));
 
+        // Payslips tab
+        document.getElementById('btnCalculateAll').addEventListener('click', calculateAllPayslips);
+        document.getElementById('btnRefreshPayslips').addEventListener('click', loadPayslips);
+        document.getElementById('payslipsTableBody').addEventListener('click', e => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const id = btn.dataset.id;
+            if (btn.classList.contains('view-payslip')) viewPayslip(id);
+            else if (btn.classList.contains('delete-payslip')) deletePayslip(id);
+            else if (btn.classList.contains('add-item-payslip')) showAddItemForm(id, false);
+        });
+        document.getElementById('btnAddItemToAll').addEventListener('click', () => showAddItemForm(null, true));
+
+        // Also when year/month changes, refresh list? We'll rely on refresh button for now.
+        document.getElementById('psYear').addEventListener('change', loadPayslips);
+        document.getElementById('psMonth').addEventListener('change', loadPayslips);
+
         // Payments
         document.getElementById('btnExportPaymentsCSV').addEventListener('click', Exports.paymentsCSV);
 
@@ -1214,6 +1367,7 @@ const EventHandlers = (() => {
         loadDecrees,
         populateDecreePersonFilter,
         loadSalaryRecords,
+        loadPayslips,
         loadPayments,
         loadDecreeItemsList,
         loadPayslipItemsList,

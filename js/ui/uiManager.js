@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.3
+ * @version     1.0.4
  * @history
+ * 1.0.5 (2026-07-23) - Payslip UI
  * 1.0.3 (2026-07-17) - Implementing Unified Item
  * 1.0.2 (2026-07-16) - Implementing Decree
  * 1.0.1 (2026-07-16) - Split Retiree into Person, Retiree, Pensioner and add Dependent
@@ -64,6 +65,9 @@ const UIManager = (() => {
                 break;
             case 'calc':
                 EventHandlers.populateDropdowns();
+                break;
+            case 'payslips':
+                EventHandlers.loadPayslips();
                 break;
             case 'payments':
                 EventHandlers.loadPayments();
