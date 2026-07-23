@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.2
+ * @version     1.0.3
  * @history
+ * 1.0.0 (2026-07-23) - payslip bulk calculation engine
  * 1.0.2 (2026-07-20) - Implementing Unified Item
  * 1.0.1 (2026-07-17) - Improving Decree Items
  * 1.0.0 (2026-07-17) - Implementing Decree
@@ -111,6 +112,23 @@ const DecreeRepository = (() => {
     }
 
     /**
+     * Returns the currently active decree for a person, including its items.
+     * @param {number} personId
+     * @returns {Object|null} Decree with items, or null if no active decree.
+     */
+    function getActiveDecreeWithItems(personId) {
+        const db = DatabaseService.getDB();
+        // Get the most recent active decree id
+        const res = db.exec(
+            'SELECT id FROM decrees WHERE person_id = ? AND is_active = 1 ORDER BY effective_from DESC, id DESC LIMIT 1',
+            [personId]
+        );
+        if (!res.length || !res[0].values.length) return null;
+        const decreeId = res[0].values[0][0];
+        return getById(decreeId);
+    }
+
+    /**
      * Soft-deletes a decree (sets is_active = 0).
      * @param {number} decreeId
      */
@@ -119,5 +137,5 @@ const DecreeRepository = (() => {
         db.run('UPDATE decrees SET is_active = 0 WHERE id = ?', [decreeId]);
     }
 
-    return { getByPersonId, getById, add, softDelete };
+    return { getByPersonId, getById, add, getActiveDecreeWithItems, softDelete };
 })();

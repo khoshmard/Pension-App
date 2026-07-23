@@ -9,7 +9,7 @@
  * 1.0.0 (2026-07-23) - Implementing Payslip Model
  */
 
-const PayslipsRepository = (() => {
+const PayslipRepository = (() => {
     // Status codes
     const STATUS = {
         CALCULATED: 0,
