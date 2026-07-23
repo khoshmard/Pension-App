@@ -8,8 +8,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.4
+ * @version     1.0.5
  * @history
+ * 1.0.5 (2026-07-23) - Implementing Payslip Model
  * 1.0.4 (2026-07-18) - Implementing Unified Item
  * 1.0.3 (2026-07-17) - Improving Decree Items
  * 1.0.2 (2026-07-16) - Implementing Decree
@@ -223,6 +224,43 @@ const DatabaseService = (() => {
             JOIN item_usage_types ut ON i.usage_type_id = ut.id
             JOIN item_applicable_entities ae ON i.applicable_entity_id = ae.id
             WHERE i.is_active = 1;`);
+
+        // Payslips
+        db.run(`
+            CREATE TABLE IF NOT EXISTS payslips (
+                id INTEGER PRIMARY KEY,
+                person_id INTEGER NOT NULL,
+                calc_year INTEGER NOT NULL,
+                calc_month INTEGER NOT NULL,
+                decree_id INTEGER,
+                total_gross REAL DEFAULT 0,
+                total_deductions REAL DEFAULT 0,
+                net_amount REAL DEFAULT 0,
+                status INTEGER DEFAULT 0,
+                notes TEXT DEFAULT '',
+                created_at TEXT DEFAULT '',
+                FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE RESTRICT,
+                FOREIGN KEY (decree_id) REFERENCES decrees(id) ON DELETE SET NULL
+            );
+        `);
+        db.run('CREATE INDEX IF NOT EXISTS idx_payslips_person ON payslips(person_id);');
+        db.run('CREATE INDEX IF NOT EXISTS idx_payslips_year_month ON payslips(calc_year, calc_month);');
+
+        // Payslip items
+        db.run(`
+            CREATE TABLE IF NOT EXISTS payslip_items (
+                id INTEGER PRIMARY KEY,
+                payslip_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                formula TEXT DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                is_income INTEGER NOT NULL DEFAULT 1,
+                source INTEGER NOT NULL DEFAULT 1,
+                reference_id INTEGER,
+                FOREIGN KEY (payslip_id) REFERENCES payslips(id) ON DELETE CASCADE
+            );
+        `);
+        db.run('CREATE INDEX IF NOT EXISTS idx_payslip_items_payslip ON payslip_items(payslip_id);');
 
         db.run(`CREATE TABLE IF NOT EXISTS salary_records (
             id INTEGER PRIMARY KEY, retiree_id INTEGER NOT NULL, year INTEGER NOT NULL, month INTEGER NOT NULL,
