@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.1.0
+ * @version     1.1.1
  * @history
+ * 1.1.1 (2026-07-24) - Categorize Items
  * 1.1.0 (2026-07-18) - Implementing Unified Item
  * 1.0.0 (2026-07-12) - Make App Modular 
  */
@@ -14,6 +15,7 @@ const ItemsRepository = (() => {
     // Cache the IDs (lookup tables are static)
     const USAGE_TYPES = { decree: 1, payslip: 2 };
     const ENTITIES = { all: 1, retiree: 2, pensioner: 3 };
+    const CATEGORIES  = { other: 1, salary: 2, benefit: 3, deduction: 4 };
 
     /**
      * Retrieves active items filtered by usage type(s) and optional applicable entity.
@@ -44,8 +46,9 @@ const ItemsRepository = (() => {
             isIncome: r[6] === 1,
             usageType: r[7],
             applicableEntity: r[8],
-            isRecurring: r[9] === 1,
-            sortOrder: r[10]
+            category: r[9],
+            isRecurring: r[10] === 1,
+            sortOrder: r[11]
         }));
     }
 
@@ -61,6 +64,16 @@ const ItemsRepository = (() => {
      */
     function getPayslipItems(entityType = null) {
         return getByUsage('payslip', entityType);
+    }
+
+    /**
+     * A function to fetch all categories for dropdowns
+     */
+    function getAllCategories() {
+        const db = DatabaseService.getDB();
+        const res = db.exec('SELECT id, name FROM item_categories ORDER BY id');
+        if (!res.length || !res[0].values.length) return [];
+        return res[0].values.map(r => ({ id: r[0], name: r[1] }));
     }
 
     /**
@@ -81,8 +94,9 @@ const ItemsRepository = (() => {
             isIncome: r[6] === 1,
             usageType: r[7],
             applicableEntity: r[8],
-            isRecurring: r[9] === 1,
-            sortOrder: r[10]
+            category: r[9],
+            isRecurring: r[10] === 1,
+            sortOrder: r[11]
         };
     }
 
@@ -95,11 +109,14 @@ const ItemsRepository = (() => {
         // Map names to IDs
         const usageTypeId = USAGE_TYPES[item.usageType] || null;
         const entityId = ENTITIES[item.applicableEntity] || ENTITIES['all'];
+        const categoryId = CATEGORIES[item.category] || CATEGORIES['other'];
         if (!usageTypeId) throw new Error('Invalid usage type');
 
-        // For decree items, force is_recurring = 1
+        // For decree items, force is_recurring = 1 and determine income status
         if (item.usageType === 'decree') {
             item.isRecurring = true;
+            if(item.category === 'salary' || item.category === 'benefit') item.isIncome = true;
+            else if (item.category === 'deduction') item.isIncome = false;
         }
         if (item.id) {
             db.run(`
@@ -129,5 +146,5 @@ const ItemsRepository = (() => {
         DatabaseService.getDB().run('UPDATE items SET is_active = 0 WHERE id = ?', [id]);
     }
 
-    return { getByUsage, getDecreeItems, getPayslipItems, getById, save, remove };
+    return { getByUsage, getDecreeItems, getPayslipItems, getById, save, remove, getAllCategories };
 })();

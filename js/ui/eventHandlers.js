@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.5
+ * @version     1.0.6
  * @history
+ * 1.0.6 (2026-07-24) - Categorize Items
  * 1.0.5 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.4 (2026-07-23) - Payslip UI
  * 1.0.3 (2026-07-19) - Implementing Unified Item
@@ -1128,7 +1129,7 @@ const EventHandlers = (() => {
                 id,
                 name: document.getElementById('diName').value.trim(),
                 formula: document.getElementById('diFormula').value.trim(),
-                isIncome: parseInt(document.getElementById('diIsIncome').value) === 1,
+                category: document.getElementById('diCategory').value,
                 amount: parseFloat(document.getElementById('diAmount').value) || 0,
                 sortOrder: parseInt(document.getElementById('diOrder').value) || 0,
                 applicableEntity: document.getElementById('diEntity').value,
@@ -1173,6 +1174,7 @@ const EventHandlers = (() => {
             const data = {
                 id,
                 name: document.getElementById('piName').value.trim(),
+                category: document.getElementById('piCategory').value, //other by default
                 isIncome: parseInt(document.getElementById('piIsIncome').value) === 1,
                 amount: parseFloat(document.getElementById('piAmount').value) || 0,
                 formula: document.getElementById('piFormula').value.trim(),

@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.6
+ * @version     1.0.7
  * @history
+ * 1.0.7 (2026-07-24) - Categorize Items
  * 1.0.6 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.5 (2026-07-23) - Payslip UI
  * 1.0.4 (2026-07-20) - Implementing Unified Item
@@ -272,7 +273,7 @@ const Templates = (() => {
                 <div style="flex:1; min-width:300px;">
                     <h4>📈 درآمدها</h4>
                     <div class="table-wrapper">
-                        <table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
+                        <table><thead><tr><th>نوع</th><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
                             <tbody id="incomeItemsTable"></tbody>
                         </table>
                     </div>
@@ -280,7 +281,7 @@ const Templates = (() => {
                 <div style="flex:1; min-width:300px;">
                     <h4>📉 کسورات</h4>
                     <div class="table-wrapper">
-                        <table><thead><tr><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
+                        <table><thead><tr><th>نوع</th><th>نام</th><th>فرمول</th><th>ترتیب</th><th>نوع حکم</th><th>عملیات</th></tr></thead>
                             <tbody id="deductionItemsTable"></tbody>
                         </table>
                     </div>
@@ -738,8 +739,12 @@ const Templates = (() => {
     function decreeItemRow(item) {
         const entityLabel = item.applicableEntity === 'retiree' ? 'مستمری‌بگیر' :
                         item.applicableEntity === 'pensioner' ? 'وظیفه‌بگیر' : 'همه';
+        const categoryLabel = item.category === 'salary' ? 'حقوق' :
+                        item.category === 'benefit' ? 'مزایا' :
+                        item.category === 'deduction' ? 'کسورات' : 'سایر';
         return `
         <tr>
+            <td>${categoryLabel}</td>
             <td>${item.name}</td>
             <td style="direction:ltr;font-family:monospace;">${item.formula}</td>
             <td>${item.sortOrder}</td>
@@ -778,10 +783,12 @@ const Templates = (() => {
                 <h3>${item ? '✏️ ویرایش' : '➕ افزودن'} آیتم حکم</h3>
                 <div class="form-grid">
                     <div class="form-group"><label>نام</label><input type="text" id="diName" value="${item?.name || ''}"></div>
-                    <div class="form-group"><label>نوع</label>
-                        <select id="diIsIncome">
-                            <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>
-                            <option value="0" ${item?.isIncome === false ? 'selected' : ''}>کسور</option>
+                    <div class="form-group">
+                        <label>دسته‌بندی</label>
+                        <select id="diCategory">
+                            <option value="salary" ${item?.category === 'salary' ? 'selected' : ''}>حقوق</option>
+                            <option value="benefit" ${item?.category=== 'benefit' ? 'selected' : ''}>مزایا</option>
+                            <option value="deduction" ${item?.category=== 'deduction' ? 'selected' : ''}>کسورات</option>
                         </select>
                     </div>
                     <div class="form-group"><label>فرمول</label><input type="text" id="diFormula" value="${item?.formula || '0'}"></div>
@@ -793,13 +800,6 @@ const Templates = (() => {
                             <option value="all" ${item?.applicableEntity === 'all' ? 'selected' : ''}>همه</option>
                             <option value="retiree" ${item?.applicableEntity === 'retiree' ? 'selected' : ''}>مستمری‌بگیر</option>
                             <option value="pensioner" ${item?.applicableEntity === 'pensioner' ? 'selected' : ''}>وظیفه‌بگیر</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="display:none;">
-                        <label>نوع درآمد</label>
-                        <select id="diIsIncome">
-                            <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>
-                            <option value="0" ${item?.isIncome === false ? 'selected' : ''}>کسور</option>
                         </select>
                     </div>
                 </div>
@@ -819,6 +819,7 @@ const Templates = (() => {
                 <h3>${item ? '✏️ ویرایش' : '➕ افزودن'} آیتم فیش</h3>
                 <div class="form-grid">
                     <div class="form-group"><label>نام</label><input type="text" id="piName" value="${item?.name || ''}"></div>
+                    <input type="hidden" id="piCategory" value="other">
                     <div class="form-group"><label>نوع</label>
                         <select id="piIsIncome">
                             <option value="1" ${item?.isIncome !== false ? 'selected' : ''}>درآمد</option>

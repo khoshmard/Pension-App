@@ -8,8 +8,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.5
+ * @version     1.0.6
  * @history
+ * 1.0.5 (2026-07-24) - Categorize Items
  * 1.0.5 (2026-07-23) - Implementing Payslip Model
  * 1.0.4 (2026-07-18) - Implementing Unified Item
  * 1.0.3 (2026-07-17) - Improving Decree Items
@@ -198,6 +199,9 @@ const DatabaseService = (() => {
         db.run(`CREATE TABLE IF NOT EXISTS item_applicable_entities (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE);`);
+        db.run(`CREATE TABLE IF NOT EXISTS item_categories (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE);`);
         // Unified Item
         db.run(`CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY,
@@ -209,20 +213,25 @@ const DatabaseService = (() => {
             is_income INTEGER NOT NULL DEFAULT 1,
             usage_type_id INTEGER NOT NULL,
             applicable_entity_id INTEGER NOT NULL,
+            category_id INTEGER NOT NULL DEFAULT 1,
             is_recurring INTEGER DEFAULT 1,
             sort_order INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
+            FOREIGN KEY (category_id) REFERENCES item_categories(id) ON DELETE RESTRICT,
             FOREIGN KEY (usage_type_id) REFERENCES item_usage_types(id) ON DELETE RESTRICT,
             FOREIGN KEY (applicable_entity_id) REFERENCES item_applicable_entities(id) ON DELETE RESTRICT);`);
         db.run('CREATE INDEX IF NOT EXISTS idx_items_usage_types ON items(usage_type_id);');
         db.run('CREATE INDEX IF NOT EXISTS idx_items_applicable_entities ON items(applicable_entity_id);');
+        db.run('CREATE INDEX IF NOT EXISTS idx_items_categories ON items(category_id);');
         db.run(`CREATE VIEW IF NOT EXISTS active_items AS
             SELECT i.id, i.name, i.formula, i.amount, i.initial, i.balance,
                 i.is_income, ut.name AS usage_type, ae.name AS applicable_entity,
+                ic.name AS category,
                 i.is_recurring, i.sort_order
             FROM items i
             JOIN item_usage_types ut ON i.usage_type_id = ut.id
             JOIN item_applicable_entities ae ON i.applicable_entity_id = ae.id
+            JOIN item_categories ic ON i.category_id = ic.id
             WHERE i.is_active = 1;`);
 
         // Payslips
@@ -284,38 +293,8 @@ const DatabaseService = (() => {
      * (Private helper)
      */
     function migrateIfNeeded() {
-        const db = DatabaseService.getDB();
-        // If old items table exists without foreign keys
-        const oldCols = db.exec("PRAGMA table_info(items)");
-        if (oldCols.length && oldCols[0].values.some(r => r[1] === 'usage_type')) {
-            // Create lookup tables if not exist
-            db.run('CREATE TABLE IF NOT EXISTS item_usage_types (id INTEGER PRIMARY KEY, name TEXT UNIQUE);');
-            db.run('CREATE TABLE IF NOT EXISTS item_applicable_entities (id INTEGER PRIMARY KEY, name TEXT UNIQUE);');
-            db.run('INSERT OR IGNORE INTO item_usage_types (name) VALUES ("decree"), ("payslip");');
-            db.run('INSERT OR IGNORE INTO item_applicable_entities (name) VALUES ("retiree"), ("pensioner"), ("all");');
-
-            // Rename old table
-            db.run('ALTER TABLE items RENAME TO items_old;');
-            // Create new table (the one with FKs)
-            createTables(); // will create the new items table
-
-            // Copy data
-            const rows = db.exec('SELECT name, formula, amount, initial, balance, is_income, usage_type, applicable_entity, is_recurring, sort_order, is_active FROM items_old');
-            if (rows.length && rows[0].values.length) {
-                rows[0].values.forEach(r => {
-                    const usageTypeId = db.exec("SELECT id FROM item_usage_types WHERE name = ?", [r[6]])[0]?.values[0]?.[0];
-                    const entityId = db.exec("SELECT id FROM item_applicable_entities WHERE name = ?", [r[7]])[0]?.values[0]?.[0];
-                    if (usageTypeId && entityId) {
-                        db.run(`
-                            INSERT INTO items (name, formula, amount, initial, balance, is_income, usage_type_id, applicable_entity_id, is_recurring, sort_order, is_active)
-                            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-                            [r[0], r[1], r[2], r[3], r[4], r[5], usageTypeId, entityId, r[8], r[9], r[10]]
-                        );
-                    }
-                });
-            }
-            db.run('DROP TABLE items_old;');
-        }
+        // Add columns that might be missing from older schema
+        try { db.run('ALTER TABLE items ADD COLUMN category_id INTEGER NOT NULL DEFAULT 1'); } catch(e) {}
     }
 
     /**
@@ -326,24 +305,29 @@ const DatabaseService = (() => {
         const db = DatabaseService.getDB();
         db.run('INSERT OR IGNORE INTO item_usage_types (name) VALUES ("decree"), ("payslip");');
         db.run('INSERT OR IGNORE INTO item_applicable_entities (name) VALUES ("all"), ("retiree"), ("pensioner");');
+        db.run('INSERT OR IGNORE INTO item_categories (name) VALUES ("other"), ("salary"), ("benefit"), ("deduction");');
 
         const count = db.exec('SELECT COUNT(*) FROM items')[0].values[0][0];
         if (count === 0) {
             // Fetch IDs for default usage types and entities
             const decreeTypeId = db.exec("SELECT id FROM item_usage_types WHERE name = 'decree'")[0].values[0][0];
             const allEntityId = db.exec("SELECT id FROM item_applicable_entities WHERE name = 'all'")[0].values[0][0];
+            const salaryId = db.exec("SELECT id FROM item_categories WHERE name='salary'")[0].values[0][0];
+            const benefitId = db.exec("SELECT id FROM item_categories WHERE name='benefit'")[0].values[0][0];
+            const deductionId = db.exec("SELECT id FROM item_categories WHERE name='deduction'")[0].values[0][0];
+            const otherId = db.exec("SELECT id FROM item_categories WHERE name='other'")[0].values[0][0];
 
             db.run(`
-                INSERT INTO items (name, formula, amount, is_income, usage_type_id, applicable_entity_id, is_recurring, sort_order)
+                INSERT INTO items (name, formula, amount, is_income, usage_type_id, applicable_entity_id, category_id, is_recurring, sort_order)
                 VALUES
-                    ('حقوق پایه', 'avgSalary * effectiveYears / maxYears', 0, 1, ?, ?, 1, 1),
-                    ('عائله‌مندی', 'spouse * minWage * spouseFactor / 100', 0, 1, ?, ?, 1, 2),
-                    ('اولاد', 'childrenUnder18 * minWage * childFactor / 100', 0, 1, ?, ?, 1, 3),
-                    ('بیمه (۱/۹)', 'totalIncome * insuranceRate / 100', 0, 0, ?, ?, 1, 1),
-                    ('بیمه تکمیلی', 'supplementaryIns', 0, 0, ?, ?, 1, 2),
-                    ('مالیات', '(totalIncome - taxExemption / 12) * 0.10', 0, 0, ?, ?, 1, 3)
-            `, [decreeTypeId, allEntityId, decreeTypeId, allEntityId, decreeTypeId, allEntityId,
-                decreeTypeId, allEntityId, decreeTypeId, allEntityId, decreeTypeId, allEntityId]);
+                    ('حقوق پایه', 'avgSalary * effectiveYears / maxYears', 0, 1, ?, ?, ?, 1, 1),
+                    ('عائله‌مندی', 'spouse * minWage * spouseFactor / 100', 0, 1, ?, ?, ?, 1, 2),
+                    ('اولاد', 'childrenUnder18 * minWage * childFactor / 100', 0, 1, ?, ?, ?, 1, 3),
+                    ('بیمه (۱/۹)', 'totalIncome * insuranceRate / 100', 0, 0, ?, ?, ?, 1, 1),
+                    ('بیمه تکمیلی', 'supplementaryIns', 0, 0, ?, ?, ?, 1, 2),
+                    ('مالیات', '(totalIncome - taxExemption / 12) * 0.10', 0, 0, ?, ?, ?, 1, 3)
+            `, [decreeTypeId, allEntityId, salaryId, decreeTypeId, allEntityId, benefitId, decreeTypeId, allEntityId, benefitId,
+                decreeTypeId, allEntityId, deductionId, decreeTypeId, allEntityId, otherId, decreeTypeId, allEntityId, deductionId]);
         }
     }
 
