@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.1.1
+ * @version     1.1.2
  * @history
+ * 1.1.2 (2026-07-26) - Add Category to Decree Items
  * 1.1.1 (2026-07-24) - Categorize Items
  * 1.1.0 (2026-07-18) - Implementing Unified Item
  * 1.0.0 (2026-07-12) - Make App Modular 
@@ -146,5 +147,5 @@ const ItemsRepository = (() => {
         DatabaseService.getDB().run('UPDATE items SET is_active = 0 WHERE id = ?', [id]);
     }
 
-    return { getByUsage, getDecreeItems, getPayslipItems, getById, save, remove, getAllCategories };
+    return { getByUsage, getDecreeItems, getPayslipItems, getById, save, remove, getAllCategories, CATEGORIES, ENTITIES, USAGE_TYPES };
 })();

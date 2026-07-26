@@ -4,8 +4,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.4
+ * @version     1.0.5
  * @history
+ * 1.0.5 (2026-07-25) - Add Category to Decree Items
  * 1.0.4 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.3 (2026-07-23) - Payslip Bulk Calculation Engine
  * 1.0.2 (2026-07-20) - Implementing Unified Item
@@ -63,14 +64,15 @@ const DecreeRepository = (() => {
             items: []
         };
         // Fetch items
-        const itemsRes = db.exec('SELECT id, item_definition_id, name, formula, is_income, amount FROM decree_items WHERE decree_id = ?', [decreeId]);
+        const itemsRes = db.exec(`SELECT i.id, i.item_definition_id, i.name, i.formula, ic.name AS category, i.amount
+            FROM decree_items i JOIN item_categories ic ON i.category_id = ic.id WHERE decree_id = ?`, [decreeId]);
         if (itemsRes.length && itemsRes[0].values.length) {
             decree.items = itemsRes[0].values.map(r => ({
                 id: r[0],
                 itemDefinitionId: r[1],
                 name: r[2],
                 formula: r[3],
-                isIncome: r[4] === 1,
+                category: r[4],
                 amount: r[5]
             }));
         }
@@ -99,13 +101,13 @@ const DecreeRepository = (() => {
 
             decree.items.forEach(item => {
                 const def = allDecreeItems.find(d => d.id === item.itemDefinitionId);
-                const name = def ? def.name : (item.isIncome ? 'درآمد' : 'کسور');
+                const name = def ? def.name : '';
                 const formula = def ? def.formula : '';
-
+                const categoryId = def ? ItemsRepository.CATEGORIES[def.category] : ItemsRepository.CATEGORIES['other'];
                 db.run(
-                    `INSERT INTO decree_items (decree_id, item_definition_id, name, formula, is_income, amount)
+                    `INSERT INTO decree_items (decree_id, item_definition_id, name, formula, category_id, amount)
                     VALUES (?,?,?,?,?,?)`,
-                    [newId, item.itemDefinitionId, name, formula, item.isIncome ? 1 : 0, item.amount]
+                    [newId, item.itemDefinitionId, name, formula, categoryId, item.amount]
                 );
             });
         }

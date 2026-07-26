@@ -6,8 +6,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.6
+ * @version     1.0.7
  * @history
+ * 1.0.7 (2026-07-26) - Add Category to Decree Items
  * 1.0.6 (2026-07-24) - Categorize Items
  * 1.0.5 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.4 (2026-07-23) - Payslip UI
@@ -652,7 +653,6 @@ const EventHandlers = (() => {
             if (!isNaN(amount) && amount !== 0) {
                 items.push({
                     itemDefinitionId: parseInt(inp.dataset.itemId),
-                    isIncome: inp.dataset.isIncome === '1',
                     amount
                 });
             }

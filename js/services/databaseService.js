@@ -8,8 +8,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.6
+ * @version     1.0.7
  * @history
+ * 1.0.6 (2026-07-25) - Add Category to Decree Items
  * 1.0.5 (2026-07-24) - Categorize Items
  * 1.0.5 (2026-07-23) - Implementing Payslip Model
  * 1.0.4 (2026-07-18) - Implementing Unified Item
@@ -185,12 +186,14 @@ const DatabaseService = (() => {
                 item_definition_id INTEGER,
                 name TEXT NOT NULL,
                 formula TEXT DEFAULT '',
-                is_income INTEGER NOT NULL DEFAULT 1,
+                category_id INTEGER NOT NULL,
                 amount REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (category_id) REFERENCES item_categories(id) ON DELETE RESTRICT,
                 FOREIGN KEY (decree_id) REFERENCES decrees(id) ON DELETE CASCADE
             );
         `);
         db.run('CREATE INDEX IF NOT EXISTS idx_decree_items_decree ON decree_items(decree_id);');
+        db.run('CREATE INDEX IF NOT EXISTS idx_decree_items_categories ON decree_items(category_id);');
 
         // Lookup tables
         db.run(`CREATE TABLE IF NOT EXISTS item_usage_types (
@@ -294,7 +297,8 @@ const DatabaseService = (() => {
      */
     function migrateIfNeeded() {
         // Add columns that might be missing from older schema
-        try { db.run('ALTER TABLE items ADD COLUMN category_id INTEGER NOT NULL DEFAULT 1'); } catch(e) {}
+        try { db.run('ALTER TABLE decree_items ADD COLUMN category_id INTEGER NOT NULL'); } catch(e) {}
+        try { db.run('ALTER TABLE decree_items DROP COLUMN is_income'); } catch(e) {}
     }
 
     /**

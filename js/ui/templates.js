@@ -5,8 +5,9 @@
  * @author      Abbas Hatami Khoshmardan <khoshmard@gmail.com>
  * @company     nouz.ir
  * @since       1.0.0
- * @version     1.0.7
+ * @version     1.0.8
  * @history
+ * 1.0.8 (2026-07-26) - Add Category to Decree Items
  * 1.0.7 (2026-07-24) - Categorize Items
  * 1.0.6 (2026-07-23) - Calculating Arrears and Confirmation
  * 1.0.5 (2026-07-23) - Payslip UI
@@ -532,19 +533,27 @@ const Templates = (() => {
         const selectedType = data?.type || prefillType;
         const lockedPerson = !!prefillPersonId || isEdit;
 
-        let incomeItems = [];
+        let salaryItems = [];
+        let benefitItems = [];
         let deductionItems = [];
-        if (data && data.items) {
+        let otherItems = [];
+        if(data && data.items) {
             // Existing decree: use its items directly
             data.items.forEach(item => {
-                if (item.isIncome) incomeItems.push(item);
-                else deductionItems.push(item);
+                if(item.category === 'salary') salaryItems.push(item);
+                else if(item.category === 'benefit') benefitItems.push(item);
+                else if(item.category === 'deduction') deductionItems.push(item);
+                else otherItems.push(item);
             });
         } else {
             // New decree: fetch current global items
             const decreeItems = ItemsRepository.getDecreeItems(prefillType);
-            incomeItems = decreeItems.filter(i => i.isIncome);
-            deductionItems = decreeItems.filter(i => !i.isIncome);
+            decreeItems.forEach(item => {
+                if(item.category === 'salary') salaryItems.push(item);
+                else if(item.category === 'benefit') benefitItems.push(item);
+                else if(item.category === 'deduction') deductionItems.push(item);
+                else otherItems.push(item);
+            });
         }
 
         const typeOptions = `
@@ -552,21 +561,40 @@ const Templates = (() => {
             <option value="pensioner" ${selectedType === 'pensioner' ? 'selected' : ''}>وظیفه‌بگیر</option>
         `;
 
-        let itemsHtml = '';
-        incomeItems.forEach(item => {
+        let salaryItemsHtml = '';
+        salaryItems.forEach(item => {
             const amount = data ? item.amount : '';
-            itemsHtml += `
+            salaryItemsHtml += `
             <div class="form-group">
-                <label>${item.name} (درآمد)</label>
-                <input type="number" class="decree-item-amount" data-item-id="${item.id}" data-is-income="1" value="${amount}" step="1000">
+                <label>${item.name}</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" value="${amount}" step="1000">
             </div>`;
         });
+        let benefitItemsHtml = '';
+        benefitItems.forEach(item => {
+            const amount = data ? item.amount : '';
+            benefitItemsHtml += `
+            <div class="form-group">
+                <label>${item.name}</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" value="${amount}" step="1000">
+            </div>`;
+        });
+        let deductionItemsHtml = '';
         deductionItems.forEach(item => {
             const amount = data ? item.amount : '';
-            itemsHtml += `
+            deductionItemsHtml += `
             <div class="form-group">
-                <label>${item.name} (کسور)</label>
-                <input type="number" class="decree-item-amount" data-item-id="${item.id}" data-is-income="0" value="${amount}" step="1000">
+                <label>${item.name}</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" value="${amount}" step="1000">
+            </div>`;
+        });
+        let otherItemsHtml = '';
+        otherItems.forEach(item => {
+            const amount = data ? item.amount : '';
+            otherItemsHtml += `
+            <div class="form-group">
+                <label>${item.name}</label>
+                <input type="number" class="decree-item-amount" data-item-id="${item.id}" value="${amount}" step="1000">
             </div>`;
         });
 
@@ -590,7 +618,14 @@ const Templates = (() => {
             </div>
             <div style="margin-top:16px;">
                 <h4>آیتم‌های حکم</h4>
-                <div class="form-grid" id="decreeItemsGrid">${itemsHtml}</div>
+                <h5>حقوق</h5>
+                <div class="form-grid" id="decreeItemsGrid">${salaryItemsHtml}</div>
+                <h5>مزایا</h5>
+                <div class="form-grid" id="decreeItemsGrid">${benefitItemsHtml}</div>
+                <h5>کسورات</h5>
+                <div class="form-grid" id="decreeItemsGrid">${deductionItemsHtml}</div>
+                <h5>غیره</h5>
+                <div class="form-grid" id="decreeItemsGrid">${otherItemsHtml}</div>
             </div>
             <div class="form-actions" style="margin-top:16px;">
                 ${!isEdit ? '<button class="btn btn-accent" id="btnSaveDecree">💾 ذخیره حکم</button>' : ''}
